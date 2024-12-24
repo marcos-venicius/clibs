@@ -12,6 +12,17 @@ LL *ll_new(FreeCallback free_callback, CompareCallback compare_callback) {
     return ll;
 }
 
+bool int_compare(void *a, void *b) {
+    return *(int*)a == *(int*)b;
+}
+
+bool string_compare(void *a, void *b) {
+    char *as = *(char**)a;
+    char *bs = *(char**)b;
+
+    return strncmp(as, bs, strlen(as)) == 0;
+}
+
 void ll_add(LL *ll, void *data, size_t data_size) {
     assertf(ll != NULL, "ll is NULL");
 
@@ -56,16 +67,26 @@ void ll_remove_by_index(LL *ll, size_t index) {
     LLNode *slow = NULL;
     LLNode *fast = ll->head;
 
-    size_t i = 0;
-
-    // TODO: what if it's the last node?
-    // TODO: what if fast is null?
-    while (i++ < index) {
+    for (size_t i = 0; i < index; ++i) {
         slow = fast;
         fast = fast->next;
     }
 
-    slow->next = fast->next;
+    // middle
+    if (slow != NULL && fast != NULL) {
+        slow->next = fast->next;
+    }
+
+    // if it's the first item, update the head
+    if (index == 0) {
+        ll->head = ll->head->next;
+    }
+
+    // if it's the last item update the tail. It also works when the last is also the first one
+    // meaning a list with only 1 item. the slow will be null then we say that tail will be null.
+    if (index + 1 == ll->count) {
+        ll->tail = slow;
+    }
 
     if (ll->free_callback != NULL) {
         ll->free_callback(fast->data);
@@ -81,52 +102,58 @@ void ll_remove_by_index(LL *ll, size_t index) {
 void ll_remove_by_value(LL *ll, void *data) {
     assertf(ll != NULL, "ll is NULL");
     assertf(ll->compare_callback != NULL, "you should have a compare callback when removing by value");
+    assertf(ll->count > 0, "there is not value inside the list");
 
     LLNode *slow = NULL;
     LLNode *fast = ll->head;
 
+    bool found = false;
+    size_t index = 0;
+
     // TODO: what if it's the last node?
     while (fast != NULL) {
         if (ll->compare_callback(fast->data, data)) {
-            if (slow == NULL) {
-                LLNode* next = ll->head->next;
-
-                if (ll->free_callback != NULL) {
-                    ll->free_callback(ll->head->data);
-                } else {
-                    free(ll->head->data);
-                }
-
-                free(ll->head);
-
-                ll->head = next;
-
-                if (ll->head->next == NULL) {
-                    ll->tail = ll->head;
-                }
-            } else {
-                slow->next = fast->next;
-
-                if (ll->free_callback != NULL) {
-                    ll->free_callback(fast->data);
-                } else {
-                    free(fast->data);
-                }
-
-                free(fast);
-
-                if (slow->next == NULL) {
-                    ll->tail = slow;
-                }
-            }
-
-            ll->count--;
-            return;
+            found = true;
+            break;
         }
 
         slow = fast;
         fast = fast->next;
+
+        ++index;
     }
+
+    if (!found) return;
+
+    // middle
+    if (slow != NULL && fast != NULL) {
+        slow->next = fast->next;
+    }
+
+    // if it's the first item, update the head
+    if (index == 0) {
+        ll->head = ll->head->next;
+    }
+
+    // if it's the last item update the tail. It also works when the last is also the first one
+    // meaning a list with only 1 item. the slow will be null then we say that tail will be null.
+    if (index + 1 == ll->count) {
+        ll->tail = slow;
+    }
+
+    if (ll->free_callback != NULL) {
+        ll->free_callback(fast->data);
+    } else {
+        free(fast->data);
+    }
+
+    free(fast);
+
+    ll->count--;
+}
+
+void ll_remove_by_value_i(LL *ll, int i) {
+    ll_remove_by_value(ll, &i);
 }
 
 void *ll_find_by_index(LL *ll, size_t index) {

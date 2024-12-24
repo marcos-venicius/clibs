@@ -22,6 +22,20 @@ void ll_add(LL *ll, void *data, size_t data_size);
 
 Add any data of any size to the linked list (ideally a Linked List should have only one data type).
 
+```c
+bool int_compare(void *a, void *b);
+```
+
+A built-in int comparer.
+
+---
+
+```c
+bool string_compare(void *a, void *b);
+```
+
+A built-in string comparer.
+
 ---
 
 ```c
@@ -47,6 +61,12 @@ void ll_remove_by_value(LL *ll, void *data);
 Allows you to remove the first item that matches the data value you pass as argument.
 
 **It's important to notice that to remove by value you should pass a `CompareCallback` in `ll_new`**.
+
+```c
+void ll_remove_by_value_i(LL *ll, int i);
+```
+
+Makes removing an integer easy.
 
 ---
 
@@ -123,6 +143,8 @@ void ll_iter_flush(LLIter *iter);
 Allows your to restore the state of the iterator to be able to iterate again.
 
 If you don't call this function before using it again, it'll crash your program with a message.
+
+**You need to call this flush after all modifications in the list** if you don't do this, it's possible to get wrong addresses after removing it.
 
 ---
 
