@@ -22,6 +22,8 @@ void ll_add(LL *ll, void *data, size_t data_size);
 
 Add any data of any size to the linked list (ideally a Linked List should have only one data type).
 
+---
+
 ```c
 bool int_compare(void *a, void *b);
 ```
