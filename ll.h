@@ -22,17 +22,23 @@ typedef struct {
     // callbacks
     CompareCallback compare_callback;
     FreeCallback free_callback;
+
+    // guarantee consistance between ll and the iterator
+    size_t version;
 } LL;
 
 typedef struct {
-  LL *ll;
-  LLNode *current;
-  size_t index;
+    LL *ll;
+    LLNode *current;
+    size_t index;
+
+    // guarantee consistance between ll and the iterator
+    size_t version;
 } LLIter;
 
 typedef struct {
-  void *data;
-  size_t index;
+    void *data;
+    size_t index;
 } LLIterItem;
 
 // default free callback is "free"

@@ -8,6 +8,7 @@ LL *ll_new(FreeCallback free_callback, CompareCallback compare_callback) {
 
     ll->compare_callback = compare_callback;
     ll->free_callback = free_callback;
+    ll->version = 1;
 
     return ll;
 }
@@ -17,8 +18,8 @@ bool int_compare(void *a, void *b) {
 }
 
 bool string_compare(void *a, void *b) {
-    char *as = *(char**)a;
-    char *bs = *(char**)b;
+    char *as = (char*)a;
+    char *bs = (char*)b;
 
     return strncmp(as, bs, strlen(as)) == 0;
 }
@@ -50,6 +51,7 @@ void ll_add(LL *ll, void *data, size_t data_size) {
     }
 
     ll->count++;
+    ll->version++;
 }
 
 void ll_add_i(LL *ll, int i) {
@@ -97,6 +99,7 @@ void ll_remove_by_index(LL *ll, size_t index) {
     free(fast);
 
     ll->count--;
+    ll->version++;
 }
 
 void ll_remove_by_value(LL *ll, void *data) {
@@ -110,7 +113,6 @@ void ll_remove_by_value(LL *ll, void *data) {
     bool found = false;
     size_t index = 0;
 
-    // TODO: what if it's the last node?
     while (fast != NULL) {
         if (ll->compare_callback(fast->data, data)) {
             found = true;
@@ -150,6 +152,7 @@ void ll_remove_by_value(LL *ll, void *data) {
     free(fast);
 
     ll->count--;
+    ll->version++;
 }
 
 void ll_remove_by_value_i(LL *ll, int i) {
@@ -194,12 +197,14 @@ LLIter ll_iter(LL *ll) {
     return (LLIter){
         .ll = ll,
         .current = ll->head,
-        .index = 0
+        .index = 0,
+        .version = ll->version
     };
 }
 
 bool ll_iter_has(LLIter *iter) {
     assertf(iter != NULL, "iter cannot be null");
+    assertf(iter->version == iter->ll->version, "Are you forgoting to call ll_iter_flush after some updates on ll?");
 
     return iter->index < iter->ll->count;
 }
@@ -207,6 +212,7 @@ bool ll_iter_has(LLIter *iter) {
 LLIterItem ll_iter_consume(LLIter *iter) {
     assertf(iter != NULL, "iter cannot be null");
     assertf(iter->current != NULL, "you reached the end of this iteration");
+    assertf(iter->version == iter->ll->version, "Are you forgoting to call ll_iter_flush after some updates on ll?");
 
     LLNode *node = iter->current;
 
@@ -226,6 +232,7 @@ void ll_iter_flush(LLIter *iter) {
 
     iter->current = iter->ll->head;
     iter->index = 0;
+    iter->version = iter->ll->version;
 }
 
 void ll_free(LL *ll) {

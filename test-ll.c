@@ -68,5 +68,41 @@ int main() {
 
     ll_free(list);
 
+    list = ll_new(NULL, string_compare);
+
+    ll_add_s(list, "testing this stuff, yeahh");
+    ll_add_s(list, "lorem ipsum dolor sit ammet consectur");
+
+    LLIter iterator = ll_iter(list);
+
+    while (ll_iter_has(&iterator)) {
+        LLIterItem item = ll_iter_consume(&iterator);
+
+        printf("%ld %s\n", item.index, (char*)item.data);
+    }
+
+    ll_remove_by_value(list, "testing this stuff, yeahh");
+
+    ll_iter_flush(&iterator);
+
+    printf("-----------------------------------------------------------------------------------------------------\n");
+    while (ll_iter_has(&iterator)) {
+        LLIterItem item = ll_iter_consume(&iterator);
+
+        printf("%ld %s\n", item.index, (char*)item.data);
+    }
+
+    char *text = ll_find_by_value(list, "testing this stuff, yeahh");
+
+    assertf(text == NULL, "text should be null not %s", text)
+    printf("Text found: %s\n", text);
+
+    text = ll_find_by_value(list, "lorem ipsum dolor sit ammet consectur");
+
+    assertf(text != NULL, "text should not be null");
+    printf("Text found: %s\n", text);
+
+    ll_free(list);
+
     return 0;
 }
