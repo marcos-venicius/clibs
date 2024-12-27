@@ -3,15 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-LL *ll_new(FreeCallback free_callback, CompareCallback compare_callback) {
-    LL *ll = calloc(1, sizeof(LL));
-
-    ll->compare_callback = compare_callback;
-    ll->free_callback = free_callback;
-    ll->version = 1;
-
-    return ll;
-}
+// callbacks
 
 bool int_compare(void *a, void *b) {
     return *(int*)a == *(int*)b;
@@ -22,6 +14,16 @@ bool string_compare(void *a, void *b) {
     char *bs = (char*)b;
 
     return strncmp(as, bs, strlen(as)) == 0;
+}
+
+LL *ll_new(FreeCallback free_callback, CompareCallback compare_callback) {
+    LL *ll = calloc(1, sizeof(LL));
+
+    ll->compare_callback = compare_callback;
+    ll->free_callback = free_callback;
+    ll->version = 1;
+
+    return ll;
 }
 
 void ll_add(LL *ll, void *data, size_t data_size) {

@@ -22,6 +22,26 @@ void ll_add(LL *ll, void *data, size_t data_size);
 
 Add any data of any size to the linked list (ideally a Linked List should have only one data type).
 
+To add a `LL*` as value you can just do something like this:
+
+```c
+    ...
+
+    LL *positions = ll_new((FreeCallback)ll_free, NULL);
+
+    ...
+
+    LL *row = ll_new(NULL, NULL);
+
+    ll_add_i(row, 10);
+
+    ll_add(positions, row, 0); // it's important the size being 0
+
+    ll_free(positions);
+```
+
+You don't need to free the row, the parent list will do this job for you!
+
 ---
 
 ```c
