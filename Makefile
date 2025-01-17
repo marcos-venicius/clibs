@@ -13,8 +13,15 @@ ll: $(LL_TEST_OBJS)
 demo: $(DEMO_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $^
 
+ll_lib:
+	$(CXX) -c ll.c -fPIC -o ll.o
+	$(CXX) ll.o -shared -o libll.so
+	mkdir -p build/ll/include
+	mv libll.so build/ll
+	cp ll.h build/ll/include
+
 %.o: %.c
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 clean:
-	rm -rf demo ll $(LL_TEST_OBJS) $(DEMO_OBJS)
+	rm -rf demo build *.o *.so ll $(LL_TEST_OBJS) $(DEMO_OBJS)
