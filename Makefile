@@ -4,8 +4,14 @@ CXX_FLAGS = -g -fsanitize=address -Wall -Wextra -pedantic
 LL_TEST_SRC = ll.c test-ll.c
 LL_TEST_OBJS = $(LL_TEST_SRC:%.c=%.o)
 
+ARR_TEST_SRC = arr.h test-arr.c
+ARR_TEST_OBJS = $(ARR_TEST_SRC:%.c=%.o)
+
 DEMO_SRC = ll.c demo.c
 DEMO_OBJS = $(DEMO_SRC:%.c=%.o)
+
+arr: $(ARR_TEST_OBJS)
+	$(CXX) $(CXX_FLAGS) -o $@ $^
 
 ll: $(LL_TEST_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $^
