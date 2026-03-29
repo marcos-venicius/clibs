@@ -28,7 +28,7 @@ Missing Operators:
 #define CL_CEARCH_MAX_MULTIPLE_VALUES_ATOM_VARIABLES 15
 #define CL_CEARCH_MAX_MULTIPLE_VALUES_ATOM_VARIABLE_VALUES 15
 
-typedef struct __cearch_expr __cearch_expr;
+typedef struct __cearch_expr_t __cearch_expr_t;
 
 typedef struct {
     char *value;
@@ -59,7 +59,7 @@ typedef struct {
     size_t size;
 } __cearch_atom_array;
 
-struct __cearch_expr {
+struct __cearch_expr_t {
     __cearch_expr_kind kind;
 
     union {
@@ -70,14 +70,14 @@ struct __cearch_expr {
         __cearch_atom_array atoms;
 
         struct {
-            __cearch_expr            *left;
-            __cearch_expr            *right;
+            __cearch_expr_t          *left;
+            __cearch_expr_t          *right;
             __cearch_binary_operator op;
         } binary;
 
         struct {
             __cearch_unary_operator op;
-            __cearch_expr           *expr;
+            __cearch_expr_t         *expr;
         } unary;
     };
 };
@@ -85,6 +85,8 @@ struct __cearch_expr {
 typedef enum {
     __cearch_token_kind_left_paren = '(',
     __cearch_token_kind_right_paren = ')',
+    __cearch_token_kind_left_square_bracket = '[',
+    __cearch_token_kind_right_square_bracket = ']',
     __cearch_token_kind_atom = ':',
     __cearch_token_kind_var = 'v',
     __cearch_token_kind_comma = ',',
@@ -108,15 +110,22 @@ struct __cearch_token_t {
 };
 
 typedef struct {
-    char    *content;
-    size_t  content_length;
-    size_t  cursor;
-    size_t  bot;
+    struct {
+        char    *content;
+        size_t  content_length;
+        size_t  cursor;
+        size_t  bot;
+
+        __cearch_token_t *tokens_head;
+        __cearch_token_t *tokens_tail;
+    } tokenizer;
+
+    struct {
+        __cearch_token_t *curr;
+    } parser;
+
     bool    has_error;
     int     stage;
-
-    __cearch_token_t *tokens_head;
-    __cearch_token_t *tokens_tail;
 } __state_t;
 
 typedef struct {
@@ -182,7 +191,7 @@ void cl_cearch_dump_tokens(CL_Cearch *cearch);
     cl_cearch_set_multiple_values_atom_variable(&cearch, "tags", "high_priority");
     cl_cearch_set_multiple_values_atom_variable(&cearch, "tags", "wodo_project");
 
-    if (!cl_cearch_compile(&cearch,  "(state not in (:blocked, :done) and is_reminder) or tags contains :high_priority")) {
+    if (!cl_cearch_compile(&cearch,  "(state not in [:blocked, :done] and is_reminder) or tags contains :high_priority")) {
         cl_cearch_free(&cearch);
 
         return 1;
@@ -197,6 +206,7 @@ void cl_cearch_dump_tokens(CL_Cearch *cearch);
     // should print "matched"
 */
 
+#define CL_CEARCH_IMPLEMENTATION
 #ifdef CL_CEARCH_IMPLEMENTATION
 #include <stdarg.h>
 #include <stdio.h>
@@ -212,6 +222,7 @@ void cl_cearch_dump_tokens(CL_Cearch *cearch);
 #define __cl_cearch_parsed_stage               4
 
 #define __new_token(n) __cearch_token_t *n = __alloc_token()
+#define __token(n) __cearch_token_t *n = cearch->__state.parser.curr
 
 static bool __cmp_sized_with_cstring(const char *sized, size_t sized_s, const char *cstr) {
     size_t cstr_s = strlen(cstr);
@@ -225,6 +236,8 @@ static const char *__token_kind_name(__cearch_token_kind_t kind) {
     switch (kind) {
         case __cearch_token_kind_left_paren: return "left_paren";
         case __cearch_token_kind_right_paren: return "right_paren";
+        case __cearch_token_kind_left_square_bracket: return "left_square_bracket";
+        case __cearch_token_kind_right_square_bracket: return "right_square_bracket";
         case __cearch_token_kind_atom: return "atom";
         case __cearch_token_kind_var: return "var";
         case __cearch_token_kind_comma: return "comma";
@@ -238,19 +251,19 @@ static const char *__token_kind_name(__cearch_token_kind_t kind) {
 }
 
 static inline void __add_token(CL_Cearch *cearch, __cearch_token_t *token) {
-    if (cearch->__state.tokens_head == NULL) {
-        cearch->__state.tokens_tail = cearch->__state.tokens_head = token;
+    if (cearch->__state.tokenizer.tokens_head == NULL) {
+        cearch->__state.tokenizer.tokens_tail = cearch->__state.tokenizer.tokens_head = token;
     } else {
-        cearch->__state.tokens_tail = cearch->__state.tokens_tail->next = token;
+        cearch->__state.tokenizer.tokens_tail = cearch->__state.tokenizer.tokens_tail->next = token;
     }
 }
 
 static inline void __advance_lexer(CL_Cearch *cearch) {
-    if (cearch->__state.cursor < cearch->__state.content_length) cearch->__state.cursor++;
+    if (cearch->__state.tokenizer.cursor < cearch->__state.tokenizer.content_length) cearch->__state.tokenizer.cursor++;
 }
 
 static inline char __chr(const CL_Cearch *cearch) {
-    return cearch->__state.cursor < cearch->__state.content_length ? cearch->__state.content[cearch->__state.cursor] : '\0';
+    return cearch->__state.tokenizer.cursor < cearch->__state.tokenizer.content_length ? cearch->__state.tokenizer.content[cearch->__state.tokenizer.cursor] : '\0';
 }
 
 static inline bool __is_var(char c) {
@@ -265,15 +278,32 @@ static inline __cearch_token_t *__alloc_token() {
     return (__cearch_token_t *)malloc(sizeof(__cearch_token_t));
 }
 
+static inline void __next_token(CL_Cearch *cearch) {
+    if (cearch->__state.parser.curr)
+        cearch->__state.parser.curr = cearch->__state.parser.curr->next;
+}
+
 static void __error(CL_Cearch *cearch, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
     static int pad_left = 7;
 
-    int content_length = cearch->__state.content_length;
-    int start = cearch->__state.bot;
-    int end = cearch->__state.cursor;
+    char *content = cearch->__state.tokenizer.content;
+    int content_length = cearch->__state.tokenizer.content_length;
+    int start = cearch->__state.tokenizer.bot;
+    int end = cearch->__state.tokenizer.cursor;
+
+    if (cearch->__state.stage >= __cl_cearch_waiting_parsing_stage) {
+        if (cearch->__state.parser.curr) {
+            content = cearch->__state.parser.curr->content;
+            start = cearch->__state.parser.curr->col;
+            end = start + cearch->__state.parser.curr->size;
+        } else {
+            start = end = content_length;
+        }
+    }
+
     int middle = end - start;
 
     if (start != end)
@@ -290,7 +320,7 @@ static void __error(CL_Cearch *cearch, const char *fmt, ...) {
 
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n\n");
-    fprintf(stderr, "%*.s\033[1;31m%.*s\033[0m\n", pad_left, "", size, cearch->__state.content + start);
+    fprintf(stderr, "%*.s\033[1;31m%.*s\033[0m\n", pad_left, "", size, content + start);
     fprintf(stderr, "%*.s^\n", pad_left + middle + si, "");
 
     va_end(args);
@@ -302,10 +332,10 @@ static inline void __consume_single_token(CL_Cearch *cearch, __cearch_token_kind
     __new_token(token);
 
     token->kind = kind;
-    token->content = cearch->__state.content + cearch->__state.bot;
+    token->content = cearch->__state.tokenizer.content + cearch->__state.tokenizer.bot;
     token->size = 1;
     token->next = NULL;
-    token->col = cearch->__state.bot;
+    token->col = cearch->__state.tokenizer.bot;
 
     __add_token(cearch, token);
     __advance_lexer(cearch);
@@ -317,10 +347,10 @@ static void __consume_variable(CL_Cearch *cearch) {
     __new_token(token);
 
     token->kind = __cearch_token_kind_var;
-    token->content = cearch->__state.content + cearch->__state.bot;
-    token->size = cearch->__state.cursor - cearch->__state.bot;
+    token->content = cearch->__state.tokenizer.content + cearch->__state.tokenizer.bot;
+    token->size = cearch->__state.tokenizer.cursor - cearch->__state.tokenizer.bot;
     token->next = NULL;
-    token->col = cearch->__state.bot;
+    token->col = cearch->__state.tokenizer.bot;
 
     if (__cmp_sized_with_cstring(token->content, token->size, "or"))
         token->kind = __cearch_token_kind_or;
@@ -354,10 +384,10 @@ static void __consume_atom(CL_Cearch *cearch) {
     __new_token(token);
 
     token->kind = __cearch_token_kind_atom;
-    token->content = cearch->__state.content + cearch->__state.bot + 1;
-    token->size = cearch->__state.cursor - cearch->__state.bot - 1;
+    token->content = cearch->__state.tokenizer.content + cearch->__state.tokenizer.bot + 1;
+    token->size = cearch->__state.tokenizer.cursor - cearch->__state.tokenizer.bot - 1;
     token->next = NULL;
-    token->col = cearch->__state.bot;
+    token->col = cearch->__state.tokenizer.bot;
 
     __add_token(cearch, token);
 }
@@ -367,16 +397,18 @@ static bool __tokenize(CL_Cearch *cearch) {
 
     cearch->__state.stage = __cl_cearch_tokenizing_stage;
 
-    while (cearch->__state.cursor < cearch->__state.content_length) {
+    while (cearch->__state.tokenizer.cursor < cearch->__state.tokenizer.content_length) {
         __consume_whitespaces(cearch);
 
-        cearch->__state.bot = cearch->__state.cursor;
+        cearch->__state.tokenizer.bot = cearch->__state.tokenizer.cursor;
 
         const char c = __chr(cearch);
 
         switch (c) {
             case __cearch_token_kind_left_paren: __consume_single_token(cearch, __cearch_token_kind_left_paren); break;
             case __cearch_token_kind_right_paren: __consume_single_token(cearch, __cearch_token_kind_right_paren); break;
+            case __cearch_token_kind_left_square_bracket: __consume_single_token(cearch, __cearch_token_kind_left_square_bracket); break;
+            case __cearch_token_kind_right_square_bracket: __consume_single_token(cearch, __cearch_token_kind_right_square_bracket); break;
             case __cearch_token_kind_comma: __consume_single_token(cearch, __cearch_token_kind_comma); break;
             case __cearch_token_kind_atom: __consume_atom(cearch); break;
             default: {
@@ -400,9 +432,7 @@ static bool __parse(CL_Cearch *cearch) {
 
     cearch->__state.stage = __cl_cearch_parsing_stage;
 
-    // TODO: start parsing expression
-
-    __error(cearch, "here parser was not initialized yet");
+    // TODO: parse expression
 
     cearch->__state.stage = __cl_cearch_parsed_stage;
 
@@ -471,10 +501,10 @@ void cl_cearch_set_multiple_values_atom_variable(CL_Cearch *cearch, const char *
 }
 
 bool cl_cearch_compile(CL_Cearch *cearch, char *search) {
-    cearch->__state.content = search;
-    cearch->__state.content_length = strlen(search);
-    cearch->__state.cursor = 0;
-    cearch->__state.bot = 0;
+    cearch->__state.tokenizer.content = search;
+    cearch->__state.tokenizer.content_length = strlen(search);
+    cearch->__state.tokenizer.cursor = 0;
+    cearch->__state.tokenizer.bot = 0;
 
     if (!__tokenize(cearch)) return false;
     if (!__parse(cearch)) return false;
@@ -490,7 +520,7 @@ bool cl_cearch_match(const CL_Cearch *cearch) {
 }
 
 void cl_cearch_free(CL_Cearch *cearch) {
-    __cearch_token_t *curr = cearch->__state.tokens_head;
+    __cearch_token_t *curr = cearch->__state.tokenizer.tokens_head;
 
     while (curr != NULL) {
         __cearch_token_t *next = curr->next;
@@ -502,7 +532,7 @@ void cl_cearch_free(CL_Cearch *cearch) {
 }
 
 void cl_cearch_dump_tokens(CL_Cearch *cearch) {
-    __cearch_token_t *curr = cearch->__state.tokens_head;
+    __cearch_token_t *curr = cearch->__state.tokenizer.tokens_head;
 
     while (curr != NULL) {
         printf("<%s value='%.*s' />\n", __token_kind_name(curr->kind), (int)curr->size, curr->content);

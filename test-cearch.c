@@ -42,7 +42,7 @@ int main(void) {
         }
     }
 
-    if (!cl_cearch_compile(&cearch,  "(state not in (:blocked, :done) and is_reminder) or tags contains :high_priority")) {
+    if (!cl_cearch_compile(&cearch,  "(state not in [:blocked, :done] and is_reminder) or tags contains :high_priority")) {
         cl_cearch_dump_tokens(&cearch);
 
         quit(1);
