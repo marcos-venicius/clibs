@@ -5,14 +5,21 @@
 
 /**
 
-Missing types:
+Missing Types:
     - Integers
     - Floats
+    - String
 
 Missing Implementations:
     - String escaping
     - UTF-8 Strings
 
+Missing Operators:
+    - Eq
+    - Gt
+    - Lt
+    - Gte
+    - Lte
 */
 
 // arbitrary numbers for now
@@ -20,6 +27,60 @@ Missing Implementations:
 #define CL_CEARCH_MAX_SINGLE_VALUE_ATOM_VARIABLES 15
 #define CL_CEARCH_MAX_MULTIPLE_VALUES_ATOM_VARIABLES 15
 #define CL_CEARCH_MAX_MULTIPLE_VALUES_ATOM_VARIABLE_VALUES 15
+
+typedef struct __cearch_expr __cearch_expr;
+
+typedef struct {
+    char *value;
+    size_t size;
+} __cearch_string;
+
+typedef enum {
+    __cearch_expr_kind_boolean,
+    __cearch_expr_kind_atom,
+    __cearch_expr_kind_atom_array,
+    __cearch_expr_kind_binary,
+    __cearch_expr_kind_unary,
+} __cearch_expr_kind;
+
+typedef enum {
+    __cearch_binary_operator_or,
+    __cearch_binary_operator_and,
+    __cearch_binary_operator_in,
+    __cearch_binary_operator_contains,
+} __cearch_binary_operator;
+
+typedef enum {
+    __cearch_unary_operator_not,
+} __cearch_unary_operator;
+
+typedef struct {
+    __cearch_string *data;
+    size_t size;
+} __cearch_atom_array;
+
+struct __cearch_expr {
+    __cearch_expr_kind kind;
+
+    union {
+        bool boolean;
+
+        // used for atom
+        __cearch_string     string;
+        __cearch_atom_array atoms;
+
+        struct {
+            __cearch_expr            *left;
+            __cearch_expr            *right;
+            __cearch_binary_operator op;
+        } binary;
+
+        struct {
+            __cearch_unary_operator op;
+            __cearch_expr           *expr;
+        } unary;
+    };
+};
 
 typedef enum {
     __cearch_token_kind_left_paren = '(',
