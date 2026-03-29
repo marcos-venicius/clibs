@@ -15,8 +15,6 @@ Missing Implementations:
 
 */
 
-#define CL_CEARCH_IMPLEMENTATION
-
 // arbitrary numbers for now
 #define CL_CEARCH_MAX_BOOLEAN_VARIABLES 15
 #define CL_CEARCH_MAX_SINGLE_VALUE_ATOM_VARIABLES 15
