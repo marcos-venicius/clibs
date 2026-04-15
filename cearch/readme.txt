@@ -2,13 +2,13 @@ Language Design:
 
     Operators:
 
-        not equal:          !=                  integers, floats, strings, nil, booleans
-        equal:              =                   integers, floats, strings, nil, booleans
-        greater:            >                   integers, floats
-        less:               <                   integers, floats
-        greater or equal:   >=                  integers, floats
-        less or equal:      <=                  integers, floats
-        negation:           !                   booleans (boolean expressions count)
+        not equal:          !=                  int, float, string, nil, bool
+        equal:              =                   int, float, string, nil, boolean
+        greater:            >                   int, float
+        less:               <                   int, float
+        greater or equal:   >=                  int, float
+        less or equal:      <=                  int, float
+        negation:           !                   bool (boolean expressions count)
 
     Logical Operators:
 
@@ -23,11 +23,11 @@ Language Design:
 
     Data Types:
 
-        arr:                [1, 2, 3]           you cannot have mixed types in an array
-        floats:             [0-9]+\.[0-9]*      C double
-        integers:           [0-9]+              C int
-        booleans:           true|false
-        strings:            '.*'                C strings           (always heap allocated)
+        array:              [1, 2, 3]           you cannot have mixed types in an array
+        float:              [0-9]+\.[0-9]*      C double
+        int:                [0-9]+              C int
+        bool:               true|false
+        str:                '.*'                C strings           (always heap allocated)
                                                 quote scaping       \'
                                                 line break escaping \n
                                                 tab escaping        \t
@@ -35,21 +35,20 @@ Language Design:
 
     Functions:
 
-        in:                 arrays (of same type), strings ; args: data (array [of same type], string)
-        trim:               strings
-        ltrim:              strings
-        rtrim:              strings
-        starts_with:        strings
-        ends_with:          strings
-        lower:              strings
-        upper:              strings
-        replace:            strings ; args: old (string), new (string)
-        len:                strings, array
-        to_bool:            strings, arrays, integers, floats, nil
-                            true values: non empty arrays and strings; non zero floats and integers; not nil values
-                            false values: empty arrays and strings; zero floats and integers; nil values
-        debug:              any type (always returns true and print the data to stderr)
-                            usage: 1.debug, 'hello world'.debug, field.debug
+        str  contains(self: str, str);
+        str  trim(self: str);
+        str  ltrim(self: str);
+        str  rtrim(self: str);
+        bool starts_with(self: str, str);
+        bool ends_with(self: str, str);
+        str  lower(self: str);
+        str  upper(self: str);
+        str  replace(self: str, old: str, new: str);
+        int  len(self: <str|array>);
+        bool to_bool(self: any); ---------------------- true values: non empty arrays and strings; non zero floats and integers; not nil values
+                                                        false values: empty arrays and strings; zero floats and integers; nil values
+        debug(self: any); ----------------------------- any type (always returns true and print the data to stderr)
+                                                        usage: 1.debug, 'hello world'.debug, field.debug
 
         All functions have the self reference,
         can have zero or more arguments and always returns
