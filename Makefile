@@ -10,9 +10,6 @@ ARR_TEST_OBJS = $(ARR_TEST_SRC:%.c=%.o)
 DEMO_SRC = ll.c demo.c
 DEMO_OBJS = $(DEMO_SRC:%.c=%.o)
 
-cearch: cearch.h test-cearch.c
-	$(CXX) $(CXX_FLAGS) -o $@ test-cearch.c
-
 arr: $(ARR_TEST_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $^
 
@@ -33,4 +30,4 @@ ll_lib:
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 clean:
-	rm -rf cearch arr demo build *.o *.so ll $(LL_TEST_OBJS) $(DEMO_OBJS)
+	rm -rf arr demo build *.o *.so ll $(LL_TEST_OBJS) $(DEMO_OBJS)
