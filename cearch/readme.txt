@@ -39,6 +39,8 @@ Language Design:
         trim:               strings
         ltrim:              strings
         rtrim:              strings
+        starts_with:        strings
+        ends_with:          strings
         lower:              strings
         upper:              strings
         replace:            strings ; args: old (string), new (string)
