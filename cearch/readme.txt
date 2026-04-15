@@ -62,3 +62,33 @@ Language Design:
         At any time, you can call `debug` for any data type.
         This function will always return true and print the self data type.
 
+Language Compiler:
+
+  Constant folder:
+
+    We propabably are going to need to have a `constant folder` step.
+    Some kind of optimizer.
+
+    For example, if we have expressions like this:
+
+    - 'Hello'.upper
+    - 'Hello'.len
+    - 'Testing it.'.replace('.', '!').lower
+
+    We can just replace this with:
+
+    - 'HELLO'
+    - 5
+    - 'testing it.'
+
+    That's good because you won't need to do these operations every single search.
+    Once compile, it's going to be constant folded.
+
+  Type Checker:  
+
+    After lexing and parsing, we should type check the whole expression.
+
+    That's needed because this language is supposed to be strictly typed.
+
+    We cannnot have mixed type arrays and we have functions that accept and returns specific
+    data types.
