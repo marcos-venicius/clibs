@@ -50,25 +50,12 @@ Language Design:
         debug(self: any); ----------------------------- any type (always returns true and print the data to stderr)
                                                         usage: 1.debug, 'hello world'.debug, field.debug
 
-        All functions have the self reference,
-        can have zero or more arguments and always returns
-        a single value.
+        All functions have at least the self argument.
+        For example when calling `'Hello'.lower`, `'Hello'` is the self and `lower` is the function
+        that is receiving this as the first parameter.
 
-        How to call a function with zero arguments:
-
-            ' Hello, World   '.lower
-
-            result: ' hello, world   '
-
-        How to join function calls:
-
-            ' Hello, World   '.lower.ltrim.rtrim
-
-            result: 'hello, world'
-
-        How to call a function with arguments:
-
-            'Hello! World'.replace('!', ',')
+        You can concatenate function calls just by putting a dot right after the previous call:
+        `'Hello! World'.replace('!', ',').lower.to_bool`
 
     Debugging:
 
