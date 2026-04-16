@@ -19,6 +19,8 @@ typedef enum {
     CT_RSQUARE,
     CT_LPAREN,
     CT_RPAREN,
+    CT_COMMA,
+    CT_DOT,
     CT_LT,
     CT_GT,
     CT_LTE,

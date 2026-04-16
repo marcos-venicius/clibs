@@ -66,6 +66,8 @@ const char *cearch_token_kind_name(Cearch_Token_Kind kind) {
         case CT_RSQUARE: return "]";
         case CT_LPAREN: return "(";
         case CT_RPAREN: return ")";
+        case CT_COMMA: return ",";
+        case CT_DOT: return ".";
         case CT_LT: return "<";
         case CT_GT: return ">";
         case CT_LTE: return "<=";
@@ -95,6 +97,10 @@ static Cearch_Token_Kind symbol_to_kind(Cearch_String symbol) {
 
 static inline char chr(const Cearch_Lexer *const lexer) {
     return lexer->cursor < lexer->content_size ? lexer->content[lexer->cursor] : '\0';
+}
+
+static inline char nchr(const Cearch_Lexer *const lexer) {
+    return lexer->cursor + 1 < lexer->content_size ? lexer->content[lexer->cursor + 1] : '\0';
 }
 
 static inline void advance_cursor(Cearch_Lexer *lexer) {
@@ -252,6 +258,24 @@ static void lex_symbol(Cearch_Lexer *lexer) {
     append_token(lexer, token);
 }
 
+static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
+    for (int i = 0; i < n; ++i) advance_cursor(lexer);
+
+    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+
+    *token = (Cearch_Token){
+        .kind = kind,
+        .content = (Cearch_String){
+            .value = lexer->content + lexer->bot,
+            .size = n
+        },
+        .location = get_location_snapshot(),
+        .next = NULL
+    };
+
+    append_token(lexer, token);
+}
+
 Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
     if (lexer->line == 0) lexer->line++;
     if (lexer->col == 0) lexer->col++;
@@ -278,6 +302,34 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
             case '9':
                 lex_digit(lexer);
                 break;
+            case '[': lex_n(lexer, CT_LSQUARE, 1); break;
+            case ']': lex_n(lexer, CT_LSQUARE, 1); break;
+            case '(': lex_n(lexer, CT_LPAREN, 1); break;
+            case ')': lex_n(lexer, CT_RPAREN, 1); break;
+            case ',': lex_n(lexer, CT_COMMA, 1); break;
+            case '.': lex_n(lexer, CT_DOT, 1); break;
+            case '=': lex_n(lexer, CT_EQ, 1); break;
+            case '!': {
+                if (nchr(lexer) == '=') {
+                    lex_n(lexer, CT_NEQ, 2);
+                } else {
+                    lex_n(lexer, CT_NOT, 1);
+                }
+            } break;
+            case '>': {
+                if (nchr(lexer) == '=') {
+                    lex_n(lexer, CT_GTE, 2);
+                } else {
+                    lex_n(lexer, CT_GT, 1);
+                }
+            } break;
+            case '<': {
+                if (nchr(lexer) == '=') {
+                    lex_n(lexer, CT_LTE, 2);
+                } else {
+                    lex_n(lexer, CT_LT, 1);
+                }
+            } break;
             default:
                 if (is_symbol(chr(lexer))) {
                     lex_symbol(lexer);

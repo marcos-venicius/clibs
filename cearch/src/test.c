@@ -36,8 +36,19 @@ int main(void) {
     TEST_LEXER("and");
     TEST_LEXER("or");
     TEST_LEXER("ltrim");
-    TEST_LEXER("()[],.");
-    TEST_LEXER("!= = > < >= <= !");
+    TEST_LEXER("[");
+    TEST_LEXER("]");
+    TEST_LEXER("(");
+    TEST_LEXER(")");
+    TEST_LEXER(",");
+    TEST_LEXER(".");
+    TEST_LEXER("!");
+    TEST_LEXER("=");
+    TEST_LEXER("!=");
+    TEST_LEXER(">");
+    TEST_LEXER(">=");
+    TEST_LEXER("<");
+    TEST_LEXER("<=");
     TEST_LEXER("'Hello \\\\ world\\'s!\\t\\n'");
 
     return 0;
