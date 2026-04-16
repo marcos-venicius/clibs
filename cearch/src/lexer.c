@@ -138,10 +138,10 @@ static void lex_digit(Cearch_Lexer *lexer) {
     int digit_length = lexer->cursor - lexer->bot;
 
     if (left_digit_length > MAX_DIGIT_LENGTH)
-        throw_error_message(get_location_snapshot(), "your digit ('%s') overflew the maximum length of %d digits", MAX_DIGIT_LENGTH);
+        throw_error_message(get_location_snapshot(), "your digit ('%.*s') overflew the maximum length of %d digits", digit_length, lexer->content + lexer->bot, MAX_DIGIT_LENGTH);
 
     if (digit_length - left_digit_length - 1 > MAX_FLOAT_POINT_LENGTH)
-        throw_error_message(get_location_snapshot(), "your digit ('%s') overflew the maximum float point length of %d digits", MAX_FLOAT_POINT_LENGTH);
+        throw_error_message(get_location_snapshot(), "your digit ('%.*s') overflew the maximum float point length of %d digits", digit_length, lexer->content + lexer->bot, MAX_FLOAT_POINT_LENGTH);
 
     char *digit = alloca(digit_length + 1);
 
