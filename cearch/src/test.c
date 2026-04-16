@@ -26,6 +26,7 @@
 
 int main(void) {
     TEST_LEXER("1");
+    TEST_LEXER("\n                    \n\n\n\n1\n\n     ");
     TEST_LEXER("1.");
     TEST_LEXER("1.34");
     TEST_LEXER("'Hello \\\\ world\\'s!\\t\\n'");

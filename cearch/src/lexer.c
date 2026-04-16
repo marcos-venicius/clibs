@@ -31,7 +31,7 @@ static Cearch_Location get_location_from_lexer(const Cearch_Lexer *lexer) {
     return (Cearch_Location){
         .line = lexer->line,
         .col_start = lexer->col,
-        .col_end = lexer->cursor
+        .col_end = lexer->col + (lexer->cursor - lexer->bot)
     };
 }
 
@@ -87,13 +87,14 @@ static inline char chr(const Cearch_Lexer *const lexer) {
 }
 
 static inline void advance_cursor(Cearch_Lexer *lexer) {
-    if (lexer->cursor < lexer->content_size) lexer->cursor++;
-    else if (lexer->content[lexer->cursor] == '\n') {
+    if (lexer->content[lexer->cursor] == '\n') {
         lexer->col = 1;
         lexer->line++;
     } else {
         lexer->col++;
     }
+
+    if (lexer->cursor < lexer->content_size) lexer->cursor++;
 }
 
 static inline void sync_bot(Cearch_Lexer *lexer) {
@@ -192,9 +193,14 @@ static void lex_digit(Cearch_Lexer *lexer) {
 }
 
 Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
-    ltrim_whitespaces(lexer);
+    if (lexer->line == 0) lexer->line++;
+    if (lexer->col == 0) lexer->col++;
 
     while (!is_empty(lexer)) {
+        ltrim_whitespaces(lexer);
+
+        if (is_empty(lexer)) break;
+
         sync_bot(lexer);
 
         save_location_snapshot(get_location_from_lexer(lexer));
