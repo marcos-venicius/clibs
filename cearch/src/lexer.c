@@ -11,6 +11,7 @@
 #define LOCATION_SNAPSHOTS_CAPACITY 256
 #define MAX_DIGIT_LENGTH 32
 #define MAX_FLOAT_POINT_LENGTH 32
+#define MAX_SYMBOL_LENGTH 64
 
 static Cearch_Location location_snapshots[LOCATION_SNAPSHOTS_CAPACITY] = {0};
 static int location_snapshots_size;
@@ -82,6 +83,16 @@ const char *cearch_token_kind_name(Cearch_Token_Kind kind) {
     }
 }
 
+static Cearch_Token_Kind symbol_to_kind(Cearch_String symbol) {
+    if (strncmp("nil", symbol.value, symbol.size) == 0) return CT_NIL;
+    if (strncmp("true", symbol.value, symbol.size) == 0) return CT_BOOL;
+    if (strncmp("false", symbol.value, symbol.size) == 0) return CT_BOOL;
+    if (strncmp("and", symbol.value, symbol.size) == 0) return CT_AND;
+    if (strncmp("or", symbol.value, symbol.size) == 0) return CT_OR;
+
+    return CT_SYM;
+}
+
 static inline char chr(const Cearch_Lexer *const lexer) {
     return lexer->cursor < lexer->content_size ? lexer->content[lexer->cursor] : '\0';
 }
@@ -109,6 +120,10 @@ static inline bool is_digit(char c) {
     return c >= '0' && c <= '9';
 }
 
+static inline bool is_symbol(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
 static inline void ltrim_whitespaces(Cearch_Lexer *lexer) {
     while (!is_empty(lexer) && (chr(lexer) == '\n' || chr(lexer) == '\t' || chr(lexer) == ' ')) advance_cursor(lexer);
 }
@@ -122,7 +137,7 @@ static inline void append_token(Cearch_Lexer *lexer, Cearch_Token *token) {
 }
 
 static void lex_digit(Cearch_Lexer *lexer) {
-    while (is_digit(chr(lexer))) advance_cursor(lexer);
+    while (!is_empty(lexer) && is_digit(chr(lexer))) advance_cursor(lexer);
 
     bool is_float = false;
 
@@ -133,7 +148,7 @@ static void lex_digit(Cearch_Lexer *lexer) {
 
         advance_cursor(lexer);
 
-        while (is_digit(chr(lexer))) advance_cursor(lexer);
+        while (!is_empty(lexer) && is_digit(chr(lexer))) advance_cursor(lexer);
     }
 
     int digit_length = lexer->cursor - lexer->bot;
@@ -192,6 +207,51 @@ static void lex_digit(Cearch_Lexer *lexer) {
     append_token(lexer, token);
 }
 
+static void lex_symbol(Cearch_Lexer *lexer) {
+    int symbol_size = 0;
+
+    while (!is_empty(lexer) && is_symbol(chr(lexer))) {
+        symbol_size++;
+
+        if (symbol_size > MAX_SYMBOL_LENGTH)
+            throw_error_message(
+                get_location_snapshot(),
+                "your symbol (%.*s...) exceeded the max length of %d characters",
+                MAX_SYMBOL_LENGTH,
+                lexer->content + lexer->bot,
+                MAX_SYMBOL_LENGTH
+            );
+
+        advance_cursor(lexer);
+    }
+
+    Cearch_String symbol = {
+        .size = symbol_size,
+        .value = lexer->content + lexer->bot
+    };
+
+    Cearch_Token_Kind kind = symbol_to_kind(symbol);
+
+    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+
+    *token = (Cearch_Token){
+        .kind = kind,
+        .content = symbol,
+        .location = get_location_snapshot(),
+        .next = NULL
+    };
+
+    if (kind == CT_BOOL) {
+        if (strncmp("true", symbol.value, symbol.size) == 0) token->as_bool = true;
+        else if (strncmp("false", symbol.value, symbol.size) == 0) token->as_bool = false;
+        else throw_error_message(token->location, "invalid boolean (%.*s)\n", symbol.size, symbol.value);
+    } else if (kind != CT_NIL) {
+        token->as_str = symbol;
+    }
+
+    append_token(lexer, token);
+}
+
 Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
     if (lexer->line == 0) lexer->line++;
     if (lexer->col == 0) lexer->col++;
@@ -219,6 +279,11 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
                 lex_digit(lexer);
                 break;
             default:
+                if (is_symbol(chr(lexer))) {
+                    lex_symbol(lexer);
+                    break;
+                }
+
                 throw_error_message(get_location_snapshot(), "unrecognized character '%c'", chr(lexer));
                 break;
         }

@@ -25,18 +25,20 @@
 } while(0);
 
 int main(void) {
+    TEST_LEXER("");
     TEST_LEXER("1");
     TEST_LEXER("\n                    \n\n\n\n1\n\n     ");
     TEST_LEXER("1.");
     TEST_LEXER("1.34");
-    TEST_LEXER("'Hello \\\\ world\\'s!\\t\\n'");
     TEST_LEXER("true");
     TEST_LEXER("false");
     TEST_LEXER("nil");
-    TEST_LEXER("!= = > < >= <= !");
-    TEST_LEXER("and or");
+    TEST_LEXER("and");
+    TEST_LEXER("or");
     TEST_LEXER("ltrim");
-    TEST_LEXER("");
+    TEST_LEXER("()[],.");
+    TEST_LEXER("!= = > < >= <= !");
+    TEST_LEXER("'Hello \\\\ world\\'s!\\t\\n'");
 
     return 0;
 }
