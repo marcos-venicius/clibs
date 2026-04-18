@@ -58,7 +58,7 @@ struct Cearch_Token {
 };
 
 typedef struct {
-    const char *content;
+    char *content;
     int content_size;
 
     int line, col, bot, cursor;
@@ -69,5 +69,6 @@ typedef struct {
 
 Cearch_Token *cearch_lex(Cearch_Lexer *lexer);
 const char *cearch_token_kind_name(Cearch_Token_Kind kind);
+void cearch_lexer_free(Cearch_Lexer *lexer);
 
 #endif // _CEARCH_LEXER_H_

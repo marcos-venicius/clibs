@@ -401,7 +401,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
             case '8':
             case '9': lex_digit(lexer); break;
             case '[': lex_n(lexer, CT_LSQUARE, 1); break;
-            case ']': lex_n(lexer, CT_LSQUARE, 1); break;
+            case ']': lex_n(lexer, CT_RSQUARE, 1); break;
             case '(': lex_n(lexer, CT_LPAREN, 1); break;
             case ')': lex_n(lexer, CT_RPAREN, 1); break;
             case ',': lex_n(lexer, CT_COMMA, 1); break;
@@ -446,4 +446,18 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
     append_token(lexer, eof);
 
     return lexer->head;
+}
+
+void cearch_lexer_free(Cearch_Lexer *lexer) {
+    Cearch_Token *curr = lexer->head;
+
+    while (curr != NULL) {
+        Cearch_Token *next = curr->next;
+
+        if (curr->kind == CT_STR) free(curr->as_str.value);
+
+        free(curr);
+
+        curr = next;
+    }
 }
