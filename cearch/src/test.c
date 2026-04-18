@@ -50,6 +50,7 @@ int main(void) {
     TEST_LEXER("<");
     TEST_LEXER("<=");
     TEST_LEXER("'Hello \\\\ world\\'s!\\t\\n'");
+    TEST_LEXER("''");
 
     return 0;
 }

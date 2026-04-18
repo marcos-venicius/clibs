@@ -12,6 +12,7 @@
 #define MAX_DIGIT_LENGTH 32
 #define MAX_FLOAT_POINT_LENGTH 32
 #define MAX_SYMBOL_LENGTH 64
+#define MAX_STRING_LENGTH 1024 * 5
 
 static Cearch_Location location_snapshots[LOCATION_SNAPSHOTS_CAPACITY] = {0};
 static int location_snapshots_size;
@@ -260,6 +261,103 @@ static void lex_symbol(Cearch_Lexer *lexer) {
     append_token(lexer, token);
 }
 
+static void lex_string(Cearch_Lexer *lexer) {
+    advance_cursor(lexer);
+
+    int string_length = 0;
+
+    while (!is_empty(lexer) && chr(lexer) != '\'') {
+        string_length++;
+
+        if (chr(lexer) == '\\') {
+            switch (nchr(lexer)) {
+                case '\'':
+                case 'n':
+                case 't':
+                case '\\':
+                    advance_cursor(lexer);
+                    break;
+                default:
+                    throw_error_message(get_location_snapshot(), "unrecognized escape sequence \\%c", nchr(lexer));
+            }
+        } else if (chr(lexer) == '\n') {
+            throw_error_message(get_location_snapshot(), "you cannot have a line break inside a string literal");
+        }
+
+        if (string_length > MAX_STRING_LENGTH) {
+            throw_error_message(get_location_snapshot(), "string literal exceeded max length of %d characters", MAX_STRING_LENGTH);
+        }
+
+        advance_cursor(lexer);
+    }
+
+    if (chr(lexer) != '\'') {
+        throw_error_message(get_location_snapshot(), "unterminated string '%.*s'", lexer->cursor - lexer->bot, lexer->content + lexer->bot);
+    }
+
+    advance_cursor(lexer);
+
+    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+
+    Cearch_String content = {
+        .value = lexer->content + lexer->bot + 1,
+        .size = lexer->cursor - lexer->bot - 2
+    };
+
+    int i = 0;
+    int str_index = 0;
+    int str_size = lexer->cursor - lexer->bot - 2;
+
+    char *str = malloc(str_size + 1);
+
+    assert(str != NULL && "could not allocate enough space for string");
+
+    str[str_size] = '\0';
+
+    while (i < str_size) {
+        char next_char = i + 1 < str_size ? lexer->content[lexer->bot + i + 1 + 1] : '\0';
+        char curr_char = lexer->content[lexer->bot + i + 1];
+
+        if (curr_char == '\\') {
+            switch (next_char) {
+                case '\'':
+                    str[str_index++] = '\'';
+                    break;
+                case 'n':
+                    str[str_index++] = '\n';
+                    break;
+                case 't':
+                    str[str_index++] = '\t';
+                    break;
+                case '\\':
+                    str[str_index++] = '\\';
+                    break;
+                default:
+                    assert(0 && "this should never happen");
+            }
+
+            i++;
+        } else {
+            str[str_index++] = lexer->content[lexer->bot + i + 1];
+        }
+
+        i++;
+    }
+
+    *token = (Cearch_Token){
+        .kind = CT_STR,
+        .content = content,
+        .as_str = (Cearch_String){
+            .value = str,
+            .size = str_size
+        },
+        .location = get_location_snapshot(),
+        .next = NULL
+    };
+
+    append_token(lexer, token);
+}
+
 static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
     for (int i = 0; i < n; ++i) advance_cursor(lexer);
 
@@ -301,9 +399,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
             case '6':
             case '7':
             case '8':
-            case '9':
-                lex_digit(lexer);
-                break;
+            case '9': lex_digit(lexer); break;
             case '[': lex_n(lexer, CT_LSQUARE, 1); break;
             case ']': lex_n(lexer, CT_LSQUARE, 1); break;
             case '(': lex_n(lexer, CT_LPAREN, 1); break;
@@ -311,6 +407,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
             case ',': lex_n(lexer, CT_COMMA, 1); break;
             case '.': lex_n(lexer, CT_DOT, 1); break;
             case '=': lex_n(lexer, CT_EQ, 1); break;
+            case '\'': lex_string(lexer); break;
             case '!': {
                 if (nchr(lexer) == '=') {
                     lex_n(lexer, CT_NEQ, 2);
