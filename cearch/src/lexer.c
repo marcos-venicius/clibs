@@ -81,6 +81,8 @@ const char *cearch_token_kind_name(Cearch_Token_Kind kind) {
 
         case CT_SYM: return "sym";
 
+        case CT_EOF: return "eof";
+
         default: assert(0 && "cearch_token_kind_name: missing Cearch_Token_Kind");
     }
 }
@@ -280,14 +282,14 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
     if (lexer->line == 0) lexer->line++;
     if (lexer->col == 0) lexer->col++;
 
-    while (!is_empty(lexer)) {
+    while (true) {
         ltrim_whitespaces(lexer);
-
-        if (is_empty(lexer)) break;
 
         sync_bot(lexer);
 
         save_location_snapshot(get_location_from_lexer(lexer));
+
+        if (is_empty(lexer)) break;
 
         switch (chr(lexer)) {
             case '0':
@@ -340,6 +342,11 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
                 break;
         }
     }
+
+    Cearch_Token *eof = malloc(sizeof(Cearch_Token));
+    *eof = (Cearch_Token){ .kind = CT_EOF, .location = get_location_snapshot() };
+
+    append_token(lexer, eof);
 
     return lexer->head;
 }

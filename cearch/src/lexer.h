@@ -34,7 +34,9 @@ typedef enum {
     CT_AND,
 
     // symbols
-    CT_SYM
+    CT_SYM,
+
+    CT_EOF
 } Cearch_Token_Kind;
 
 
