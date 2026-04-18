@@ -1,0 +1,21 @@
+% Init the parser
+
+.state todo
+.date 2026-04-18 12:13:52-03:00
+.tags
+.remind
+
+Create basic types to the parser:
+
+- Expression
+- Node Type
+
+Handle memory using Arena allocation so it'll be more fast and easy to manage the memory.
+
+Start parsing simple expressions, like primary (literal values):
+
+- integers
+- floats
+- strings
+- booleans
+- nil
