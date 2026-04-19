@@ -52,4 +52,10 @@ struct Cearch_Ast_Node {
     };
 };
 
+// TODO: Which algorithm should I use?
+//       - Recursive Descent
+//       - Pratt Parsing (I'm thinking to use this for the first time)
+// 
+// TODO: Setup Arena
+
 #endif // _CEARCH_PARSER_H_

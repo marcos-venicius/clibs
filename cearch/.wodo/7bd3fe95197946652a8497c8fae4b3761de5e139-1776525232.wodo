@@ -1,3 +1,20 @@
+% Research about Arena allocation
+
+.state doing
+.date 2026-04-19 18:05:05-03:00
+.tags
+
+It seems to be really adequate for this kind of use.
+
+% Research about Pratt parsing
+
+.state doing
+.date 2026-04-19 18:04:32-03:00
+.tags
+.remind
+
+Is this better than recursive descent to this language?
+
 % Init the parser
 
 .state todo
