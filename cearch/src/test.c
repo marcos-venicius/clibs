@@ -123,7 +123,7 @@ int main(void) {
 
     {
         printf("001\n");
-        char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug";
+        char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim().lower.debug";
 
         Cearch_Lexer lexer = {
             .content = expression,
