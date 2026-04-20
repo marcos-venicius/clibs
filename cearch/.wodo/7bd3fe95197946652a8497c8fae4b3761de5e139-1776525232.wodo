@@ -1,3 +1,10 @@
+% Create a function to print the ast
+
+.state todo
+.date 2026-04-20 09:04:17-03:00
+.tags
+.remind
+
 % Add arena to the lexer
 
 .state todo
