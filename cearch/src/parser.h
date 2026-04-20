@@ -67,8 +67,8 @@ struct Cearch_Ast_Node {
 typedef struct {
     Cearch_Ast_Node* ast;
     Cearch_Token*    tokens_head;
-    Cearch_Arena*    ast_arena;
-    Cearch_Arena*    strs_arena;
+    Clibs_Arena*    ast_arena;
+    Clibs_Arena*    strs_arena;
 
     Cearch_Token *last_successfull_parsed_token;
 } Cearch_Parser;

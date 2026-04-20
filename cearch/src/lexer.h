@@ -67,8 +67,8 @@ typedef struct {
     Cearch_Token *head;
     Cearch_Token *tail;
 
-    Cearch_Arena *tokens_arena;
-    Cearch_Arena *strs_arena;
+    Clibs_Arena *tokens_arena;
+    Clibs_Arena *strs_arena;
 } Cearch_Lexer;
 
 Cearch_Lexer *cearch_create_lexer(char *content, size_t content_size);

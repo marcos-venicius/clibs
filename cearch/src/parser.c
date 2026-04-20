@@ -111,7 +111,7 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
 
     if (!token) return NULL;
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->location = token->location;
 
     switch (token->kind) {
@@ -131,7 +131,7 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
             node->as_bool = token->as_bool;
             break;
         case CT_STR: {
-            char *str = arena_alloc(parser->strs_arena, token->as_str.size + 1);
+            char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
 
             memcpy(str, token->as_str.value, token->as_str.size);
 
@@ -185,7 +185,7 @@ static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
 
     Cearch_Ast_Node *operand = parse_expression(parser, PREC_UNARY);
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->type = ANT_UNARY;
     node->location = operator_token->location;
 
@@ -202,11 +202,11 @@ static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
 
     parser->last_successfull_parsed_token = token;
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->type = ANT_IDENTIFIER;
     node->location = token->location;
 
-    char *str = arena_alloc(parser->strs_arena, token->as_str.size + 1);
+    char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
     memcpy(str, token->as_str.value, token->as_str.size);
     str[token->as_str.size] = '\0';
 
@@ -260,7 +260,7 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
     Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->type = ANT_BINARY;
     node->location = left->location;
 
@@ -274,7 +274,7 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
 static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
     Cearch_Token *lbracket_token = consume_token(parser);
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
 
     node->type = ANT_ARRAY;
     node->location = lbracket_token->location;
@@ -328,11 +328,11 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
         throw_error_message(dot_token->location, "expected method name after '.'");
     }
 
-    char *method_name = arena_alloc(parser->strs_arena, name_token->as_str.size + 1);
+    char *method_name = clibs_arena_alloc(parser->strs_arena, name_token->as_str.size + 1);
     memcpy(method_name, name_token->as_str.value, name_token->as_str.size);
     method_name[name_token->as_str.size] = '\0';
 
-    Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->type = ANT_METHOD_CALL;
     node->location = dot_token->location;
     node->as_method_call.method_name = (Cearch_String){
@@ -391,8 +391,8 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
 Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head) {
     Cearch_Parser *parser = malloc(sizeof(Cearch_Parser));
 
-    Cearch_Arena *strs_arena = arena_create(PARSER_STRS_ARENA_CAPACITY);
-    Cearch_Arena *ast_arena = arena_create(PARSER_AST_ARENA_CAPACITY);
+    Clibs_Arena *strs_arena = clibs_arena_create(PARSER_STRS_ARENA_CAPACITY);
+    Clibs_Arena *ast_arena = clibs_arena_create(PARSER_AST_ARENA_CAPACITY);
 
     parser->ast_arena = ast_arena;
     parser->strs_arena = strs_arena;
@@ -416,7 +416,7 @@ Cearch_Ast_Node *cearch_parse_expression(Cearch_Parser *parser) {
 }
 
 void cearch_free_parser(Cearch_Parser *parser) {
-    arena_destroy(parser->ast_arena);
-    arena_destroy(parser->strs_arena);
+    clibs_arena_destroy(parser->ast_arena);
+    clibs_arena_destroy(parser->strs_arena);
     free(parser);
 }
