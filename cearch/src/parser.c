@@ -313,7 +313,7 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     node->as_method_call.self = left;
 
     // zero-argument methods don't need parenthesis
-    if (peek_token(parser) != NULL && peek_token(parser)->kind != CT_LPAREN) {
+    if (peek_token(parser) != NULL && peek_token(parser)->kind == CT_LPAREN) {
         // eat '('
         consume_token(parser);
 
