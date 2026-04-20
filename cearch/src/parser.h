@@ -69,6 +69,8 @@ typedef struct {
     Cearch_Token*    tokens_head;
     Cearch_Arena*    ast_arena;
     Cearch_Arena*    strs_arena;
+
+    Cearch_Token *last_successfull_parsed_token;
 } Cearch_Parser;
 
 Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head);

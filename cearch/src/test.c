@@ -122,6 +122,7 @@ int main(void) {
     TEST_LEXER("''");
 
     {
+        printf("001\n");
         char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug";
 
         Cearch_Lexer lexer = {
@@ -144,6 +145,8 @@ int main(void) {
     printf("\n\n");
 
     {
+        printf("002\n");
+
         char *expression = "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'";
 
         Cearch_Lexer lexer = {
@@ -166,6 +169,8 @@ int main(void) {
     printf("\n\n");
 
     {
+        printf("003\n");
+
         char *expression = "(((!(false) or (!!true))))";
 
         Cearch_Lexer lexer = {
@@ -188,6 +193,8 @@ int main(void) {
     printf("\n\n");
 
     {
+        printf("004\n");
+
         char *expression = "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])";
 
         Cearch_Lexer lexer = {

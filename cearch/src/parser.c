@@ -153,12 +153,16 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
             break;
     }
 
+    parser->last_successfull_parsed_token = token;
+
     return node;
 }
 
 static Cearch_Ast_Node *parse_group(Cearch_Parser *parser) {
     // eat '('
     Cearch_Token *lparen = consume_token(parser);
+
+    parser->last_successfull_parsed_token = lparen;
 
     Cearch_Ast_Node *node = parse_expression(parser, PREC_NONE);
 
@@ -169,7 +173,7 @@ static Cearch_Ast_Node *parse_group(Cearch_Parser *parser) {
     }
 
     // eat ')'
-    consume_token(parser);
+    parser->last_successfull_parsed_token = consume_token(parser);
 
     return node;
 }
@@ -177,6 +181,8 @@ static Cearch_Ast_Node *parse_group(Cearch_Parser *parser) {
 static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
     // eat '!'
     Cearch_Token *operator_token = consume_token(parser);
+
+    parser->last_successfull_parsed_token = operator_token;
 
     Cearch_Ast_Node *operand = parse_expression(parser, PREC_UNARY);
 
@@ -194,6 +200,8 @@ static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
     Cearch_Token *token = consume_token(parser);
 
     if (!token) return NULL;
+
+    parser->last_successfull_parsed_token = token;
 
     Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->type = ANT_IDENTIFIER;
@@ -223,6 +231,8 @@ static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Pr
     }
 
     Cearch_Ast_Node *left = prefix_rule(parser);
+
+    parser->last_successfull_parsed_token = parser->tokens_head;
 
     while (peek_token(parser) != NULL && precedence < get_rule(peek_token(parser)->kind)->precedence) {
         token = peek_token(parser);
@@ -261,6 +271,8 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
     node->type = ANT_ARRAY;
     node->location = lbracket_token->location;
 
+    parser->last_successfull_parsed_token = peek_token(parser);
+
     while (parser->tokens_head != NULL && parser->tokens_head->kind != CT_RSQUARE) {
         if (node->as_array.elements_length >= MAX_ARRAY_LENGTH) {
             throw_error_message(lbracket_token->location, "array exceeds maximum length of %d", MAX_ARRAY_LENGTH);
@@ -269,14 +281,23 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
         node->as_array.elements[node->as_array.elements_length++] = parse_expression(parser, 0);
 
         if (parser->tokens_head->kind == CT_COMMA) {
-            consume_token(parser); // eat the ','
+            parser->last_successfull_parsed_token = consume_token(parser); // eat the ','
         } else if (parser->tokens_head->kind != CT_RSQUARE) {
             throw_error_message(
-                parser->tokens_head->location,
+                parser->last_successfull_parsed_token->location,
                 "expected ',' or ']' in array but got '%s'",
                 cearch_token_kind_name(parser->tokens_head->kind)
             );
+        } else {
+            parser->last_successfull_parsed_token = peek_token(parser);
         }
+    }
+
+    if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CT_COMMA) {
+        throw_error_message(
+            parser->last_successfull_parsed_token->location,
+            "please, remove the trailing comma"
+        );
     }
 
     if (parser->tokens_head == NULL || parser->tokens_head->kind != CT_RSQUARE) {
@@ -317,6 +338,8 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
         // eat '('
         consume_token(parser);
 
+        parser->last_successfull_parsed_token = parser->tokens_head;
+
         // parse until hit ')'
         while (peek_token(parser) != NULL && peek_token(parser)->kind != CT_RPAREN) {
             if (node->as_method_call.arguments_length >= MAX_FUNCTION_ARGUMENTS) {
@@ -327,14 +350,23 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
             if (peek_token(parser)->kind == CT_COMMA) {
                 // eat ','
-                consume_token(parser);
+                parser->last_successfull_parsed_token = consume_token(parser);
             } else if (peek_token(parser)->kind != CT_RPAREN) {
                 throw_error_message(
-                    peek_token(parser)->location,
+                    parser->last_successfull_parsed_token->location,
                     "expected ',' or ')' in argument list but got '%s'",
                     cearch_token_kind_name(peek_token(parser)->kind)
                 );
+            } else {
+                parser->last_successfull_parsed_token = peek_token(parser);
             }
+        }
+
+        if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CT_COMMA) {
+            throw_error_message(
+                parser->last_successfull_parsed_token->location,
+                "please, remove the trailing comma"
+            );
         }
 
         if (peek_token(parser) == NULL || peek_token(parser)->kind != CT_RPAREN) {
@@ -362,7 +394,17 @@ Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head) {
 }
 
 Cearch_Ast_Node *cearch_parse_expression(Cearch_Parser *parser) {
-    return parse_expression(parser, PREC_NONE);
+    Cearch_Ast_Node *ast = parse_expression(parser, PREC_NONE);
+
+    if (parser->tokens_head != NULL && parser->tokens_head->kind != CT_EOF) {
+        throw_error_message(
+            parser->last_successfull_parsed_token->location,
+            "invalid syntax. expected an operator or EOF but got '%s'",
+            cearch_token_kind_name(parser->tokens_head->kind)
+        );
+    }
+
+    return ast;
 }
 
 void cearch_free_parser(Cearch_Parser *parser) {
