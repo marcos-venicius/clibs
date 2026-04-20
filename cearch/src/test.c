@@ -1,6 +1,8 @@
+#include "./lexer.h"
+#include "./parser.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "./lexer.h"
 
 #define TEST_LEXER(q) do                                                        \
 {                                                                               \
@@ -53,6 +55,22 @@ int main(void) {
     TEST_LEXER("<=");
     TEST_LEXER("'|Hello \\\\ world\\'s!\\t|\\n  |'");
     TEST_LEXER("''");
+
+    char *expression = "('  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug and 1 < 2) or (7 >= 5)";
+
+    Cearch_Lexer lexer = {
+        .content = expression,
+        .content_size = strlen(expression)
+    };
+
+    Cearch_Token *head = cearch_lex(&lexer);
+
+    Cearch_Parser *parser = cearch_create_parser(head);
+
+    cearch_parse_expression(parser);
+
+    cearch_free_parser(parser);
+    cearch_lexer_free(&lexer);
 
     return 0;
 }

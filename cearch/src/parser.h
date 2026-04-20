@@ -4,13 +4,19 @@
 #include "./location.h"
 #include "./string.h"
 #include "./lexer.h"
+#include "./arena.h"
 
 #define MAX_FUNCTION_ARGUMENTS 32
+#define MAX_ARRAY_LENGTH 256
 
 typedef enum {
+    ANT_NIL,
     ANT_INT,
     ANT_FLOAT,
     ANT_STR,
+    ANT_BOOL,
+    ANT_ARRAY,
+    ANT_IDENTIFIER,
     ANT_UNARY,
     ANT_BINARY,
     ANT_METHOD_CALL
@@ -26,6 +32,7 @@ struct Cearch_Ast_Node {
     union {
         int           as_int;
         double        as_float;
+        bool          as_bool;
         Cearch_String as_str;
         Cearch_String as_identifier;
 
@@ -46,16 +53,26 @@ struct Cearch_Ast_Node {
             Cearch_Ast_Node* self;
             Cearch_String    method_name;
 
-            Cearch_Ast_Node* arguments[32];
+            Cearch_Ast_Node* arguments[MAX_FUNCTION_ARGUMENTS];
             int              arguments_length;
         } as_method_call;
+
+        struct {
+            Cearch_Ast_Node* elements[MAX_ARRAY_LENGTH];
+            int              elements_length;
+        } as_array;
     };
 };
 
-// TODO: Which algorithm should I use?
-//       - Recursive Descent
-//       - Pratt Parsing (I'm thinking to use this for the first time)
-// 
-// TODO: Setup Arena
+typedef struct {
+    Cearch_Ast_Node* ast;
+    Cearch_Token*    tokens_head;
+    Cearch_Arena*    ast_arena;
+    Cearch_Arena*    strs_arena;
+} Cearch_Parser;
+
+Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head);
+Cearch_Ast_Node *cearch_parse_expression(Cearch_Parser *parser);
+void cearch_free_parser(Cearch_Parser *parser);
 
 #endif // _CEARCH_PARSER_H_

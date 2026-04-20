@@ -1,23 +1,34 @@
+% Add arena to the lexer
+
+.state todo
+.date 2026-04-20 07:40:25-03:00
+.tags
+.remind
+
 % Research about Arena allocation
 
-.state doing
+.state done
 .date 2026-04-19 18:05:05-03:00
 .tags
 
 It seems to be really adequate for this kind of use.
 
+That's really nice and we are going to use it.
+
 % Research about Pratt parsing
 
-.state doing
+.state done
 .date 2026-04-19 18:04:32-03:00
 .tags
 .remind
 
 Is this better than recursive descent to this language?
 
+It's beautiful and easy.
+
 % Init the parser
 
-.state todo
+.state done
 .date 2026-04-18 12:13:52-03:00
 .tags
 .remind
