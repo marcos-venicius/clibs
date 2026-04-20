@@ -141,6 +141,8 @@ int main(void) {
         cearch_lexer_free(&lexer);
     }
 
+    printf("\n\n");
+
     {
         char *expression = "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'";
 
@@ -161,8 +163,32 @@ int main(void) {
         cearch_lexer_free(&lexer);
     }
 
+    printf("\n\n");
+
     {
         char *expression = "(((!(false) or (!!true))))";
+
+        Cearch_Lexer lexer = {
+            .content = expression,
+            .content_size = strlen(expression)
+        };
+
+        Cearch_Token *head = cearch_lex(&lexer);
+
+        Cearch_Parser *parser = cearch_create_parser(head);
+
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
+
+        cearch_print_ast(ast, 0);
+
+        cearch_free_parser(parser);
+        cearch_lexer_free(&lexer);
+    }
+
+    printf("\n\n");
+
+    {
+        char *expression = "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])";
 
         Cearch_Lexer lexer = {
             .content = expression,
