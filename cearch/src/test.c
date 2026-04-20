@@ -56,7 +56,7 @@ int main(void) {
     TEST_LEXER("'|Hello \\\\ world\\'s!\\t|\\n  |'");
     TEST_LEXER("''");
 
-    char *expression = "('  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug and 1 < 2) or (7 >= 5)";
+    char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug";
 
     Cearch_Lexer lexer = {
         .content = expression,

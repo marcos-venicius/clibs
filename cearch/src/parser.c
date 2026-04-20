@@ -41,6 +41,7 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser);
 static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Precedence precedence);
 static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *left);
 static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *left);
+static Cearch_Ast_Node *parse_group(Cearch_Parser *parser);
 
 static Cearch_Parse_Rule parsing_rules[] = {
     // literals and identifiers
@@ -51,6 +52,7 @@ static Cearch_Parse_Rule parsing_rules[] = {
     [CT_NIL]        = {parse_literal,       NULL,           PREC_NONE},
     [CT_SYM]        = {parse_identifier,    NULL,           PREC_NONE},
     [CT_LSQUARE]    = {parse_array,         NULL,           PREC_NONE},
+    [CT_LPAREN]     = {parse_group,         NULL,           PREC_NONE},
 
     // unary operators
     [CT_NOT]        = {parse_unary,         NULL,           PREC_NONE},
@@ -150,6 +152,24 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
             );
             break;
     }
+
+    return node;
+}
+
+static Cearch_Ast_Node *parse_group(Cearch_Parser *parser) {
+    // eat '('
+    Cearch_Token *lparen = consume_token(parser);
+
+    Cearch_Ast_Node *node = parse_expression(parser, PREC_NONE);
+
+    Cearch_Token *next = peek_token(parser);
+
+    if (next == NULL || next->kind != CT_RPAREN) {
+        throw_error_message(lparen->location, "unterminated group, expected ')'");
+    }
+
+    // eat ')'
+    consume_token(parser);
 
     return node;
 }
