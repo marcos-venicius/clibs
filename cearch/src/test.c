@@ -28,6 +28,71 @@
     cearch_lexer_free(&lexer);                                                  \
 } while(0);
 
+void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
+    if (!node) return;
+
+    // 1. Print Indentation
+    for (int i = 0; i < depth; i++) printf("  │ ");
+
+    // 2. Handle Node Types
+    switch (node->type) {
+        case ANT_INT:
+            printf("INT: %d\n", node->as_int);
+            break;
+        case ANT_FLOAT:
+            printf("FLOAT: %f\n", node->as_float);
+            break;
+        case ANT_BOOL:
+            printf("BOOL: %s\n", node->as_bool ? "true" : "false");
+            break;
+        case ANT_STR:
+            printf("STR: \"%s\"\n", node->as_str.value);
+            break;
+        case ANT_IDENTIFIER:
+            printf("ID: %s\n", node->as_identifier.value);
+            break;
+
+        case ANT_UNARY:
+            printf("UNARY_OP: %s\n", cearch_token_kind_name(node->as_unary.op));
+            cearch_print_ast(node->as_unary.operand, depth + 1);
+            break;
+
+        case ANT_BINARY:
+            printf("BINARY_OP: %s\n", cearch_token_kind_name(node->as_binary.op));
+            cearch_print_ast(node->as_binary.left, depth + 1);
+            cearch_print_ast(node->as_binary.right, depth + 1);
+            break;
+
+        case ANT_METHOD_CALL:
+            printf("METHOD_CALL: .%s\n", node->as_method_call.method_name.value);
+            // Print 'self' (the object the method is called on)
+            for (int i = 0; i <= depth; i++) printf("  │ ");
+            printf("SELF:\n");
+            cearch_print_ast(node->as_method_call.self, depth + 2);
+            
+            // Print arguments
+            if (node->as_method_call.arguments_length > 0) {
+                for (int i = 0; i <= depth; i++) printf("  │ ");
+                printf("ARGS:\n");
+                for (int i = 0; i < node->as_method_call.arguments_length; i++) {
+                    cearch_print_ast(node->as_method_call.arguments[i], depth + 2);
+                }
+            }
+            break;
+
+        case ANT_ARRAY:
+            printf("ARRAY: [%d elements]\n", node->as_array.elements_length);
+            for (int i = 0; i < node->as_array.elements_length; i++) {
+                cearch_print_ast(node->as_array.elements[i], depth + 1);
+            }
+            break;
+
+        default:
+            printf("UNKNOWN_NODE_TYPE\n");
+            break;
+    }
+}
+
 int main(void) {
     TEST_LEXER("");
     TEST_LEXER("1");
@@ -56,21 +121,65 @@ int main(void) {
     TEST_LEXER("'|Hello \\\\ world\\'s!\\t|\\n  |'");
     TEST_LEXER("''");
 
-    char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug";
+    {
+        char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim.lower.debug";
 
-    Cearch_Lexer lexer = {
-        .content = expression,
-        .content_size = strlen(expression)
-    };
+        Cearch_Lexer lexer = {
+            .content = expression,
+            .content_size = strlen(expression)
+        };
 
-    Cearch_Token *head = cearch_lex(&lexer);
+        Cearch_Token *head = cearch_lex(&lexer);
 
-    Cearch_Parser *parser = cearch_create_parser(head);
+        Cearch_Parser *parser = cearch_create_parser(head);
 
-    cearch_parse_expression(parser);
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
 
-    cearch_free_parser(parser);
-    cearch_lexer_free(&lexer);
+        cearch_print_ast(ast, 0);
+
+        cearch_free_parser(parser);
+        cearch_lexer_free(&lexer);
+    }
+
+    {
+        char *expression = "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'";
+
+        Cearch_Lexer lexer = {
+            .content = expression,
+            .content_size = strlen(expression)
+        };
+
+        Cearch_Token *head = cearch_lex(&lexer);
+
+        Cearch_Parser *parser = cearch_create_parser(head);
+
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
+
+        cearch_print_ast(ast, 0);
+
+        cearch_free_parser(parser);
+        cearch_lexer_free(&lexer);
+    }
+
+    {
+        char *expression = "(((!(false) or (!!true))))";
+
+        Cearch_Lexer lexer = {
+            .content = expression,
+            .content_size = strlen(expression)
+        };
+
+        Cearch_Token *head = cearch_lex(&lexer);
+
+        Cearch_Parser *parser = cearch_create_parser(head);
+
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
+
+        cearch_print_ast(ast, 0);
+
+        cearch_free_parser(parser);
+        cearch_lexer_free(&lexer);
+    }
 
     return 0;
 }
