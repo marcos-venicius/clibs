@@ -250,6 +250,15 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
     Cearch_Parse_Rule *rule = get_rule(operator->kind);
 
+    // prevent against chained operator like '1 > 2 > 3'
+    if (left->type == ANT_BINARY && get_rule(left->as_binary.op)->precedence == rule->precedence) {
+        throw_error_message(
+            operator->location,
+            "operator '%s' cannot be chained",
+            cearch_token_kind_name(operator->kind)
+        );
+    }
+
     Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
 
     Cearch_Ast_Node *node = arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
