@@ -8,6 +8,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#define PARSER_AST_ARENA_CAPACITY (sizeof(Cearch_Ast_Node) * 512)
+// 16 Kilobytes of memory should be enough to strings?
+#define PARSER_STRS_ARENA_CAPACITY (16 * 1024)
+
 typedef enum {
     PREC_NONE,
     PREC_OR,
@@ -27,11 +31,6 @@ typedef struct {
     Cearch_Parser_Infix_Fn infix;
     Cearch_Parser_Precedence precedence;
 } Cearch_Parse_Rule;
-
-// 64 Kilobytes of memory should be enough to all kinds of expressions
-#define PARSER_AST_ARENA_CAPACITY (64 * 1024)
-// 16 Kilobytes of memory should be enough to strings?
-#define PARSER_STRS_ARENA_CAPACITY (16 * 1024)
 
 // forward declarations
 static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser);
