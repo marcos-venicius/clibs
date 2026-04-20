@@ -13,6 +13,8 @@
 #define MAX_FLOAT_POINT_LENGTH 32
 #define MAX_SYMBOL_LENGTH 64
 #define MAX_STRING_LENGTH 1024 * 5
+#define LEXER_TOKENS_ARENA_CAPACITY (sizeof(Cearch_Token) * 1024)
+#define LEXER_STRS_ARENA_CAPACITY (32 * 1024)
 
 static Cearch_Location location_snapshots[LOCATION_SNAPSHOTS_CAPACITY] = {0};
 static int location_snapshots_size;
@@ -175,7 +177,7 @@ static void lex_digit(Cearch_Lexer *lexer) {
     digit[digit_length] = '\0';
 
     char *endptr;
-    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+    Cearch_Token *token = arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
 
     if (is_float) {
         double value = strtod(digit, &endptr);
@@ -241,7 +243,7 @@ static void lex_symbol(Cearch_Lexer *lexer) {
 
     Cearch_Token_Kind kind = symbol_to_kind(symbol);
 
-    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+    Cearch_Token *token = arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
 
     *token = (Cearch_Token){
         .kind = kind,
@@ -297,7 +299,7 @@ static void lex_string(Cearch_Lexer *lexer) {
 
     advance_cursor(lexer);
 
-    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+    Cearch_Token *token = arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
 
     Cearch_String content = {
         .value = lexer->content + lexer->bot + 1,
@@ -308,7 +310,7 @@ static void lex_string(Cearch_Lexer *lexer) {
     int str_index = 0;
     int str_size = lexer->cursor - lexer->bot - 2;
 
-    char *str = malloc(str_size + 1);
+    char *str = arena_alloc(lexer->strs_arena, str_size + 1);
 
     assert(str != NULL && "could not allocate enough space for string");
 
@@ -361,7 +363,7 @@ static void lex_string(Cearch_Lexer *lexer) {
 static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
     for (int i = 0; i < n; ++i) advance_cursor(lexer);
 
-    Cearch_Token *token = malloc(sizeof(Cearch_Token));
+    Cearch_Token *token = arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
 
     *token = (Cearch_Token){
         .kind = kind,
@@ -376,10 +378,27 @@ static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
     append_token(lexer, token);
 }
 
-Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
-    if (lexer->line == 0) lexer->line++;
-    if (lexer->col == 0) lexer->col++;
 
+Cearch_Lexer *cearch_create_lexer(char *content, size_t content_size) {
+    Cearch_Lexer *lexer = malloc(sizeof(Cearch_Lexer));
+    Cearch_Arena *tokens_arena = arena_create(LEXER_TOKENS_ARENA_CAPACITY);
+    Cearch_Arena *strs_arena = arena_create(LEXER_STRS_ARENA_CAPACITY);
+
+    lexer->line = 1;
+    lexer->col = 1;
+    lexer->bot = 0;
+    lexer->cursor = 0;
+    lexer->content = content;
+    lexer->content_size = content_size;
+    lexer->head = NULL;
+    lexer->tail = NULL;
+    lexer->tokens_arena = tokens_arena;
+    lexer->strs_arena = strs_arena;
+
+    return lexer;
+}
+
+Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
     while (true) {
         ltrim_whitespaces(lexer);
 
@@ -440,7 +459,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
         }
     }
 
-    Cearch_Token *eof = malloc(sizeof(Cearch_Token));
+    Cearch_Token *eof = arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
     *eof = (Cearch_Token){ .kind = CT_EOF, .location = get_location_snapshot() };
 
     append_token(lexer, eof);
@@ -449,15 +468,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
 }
 
 void cearch_lexer_free(Cearch_Lexer *lexer) {
-    Cearch_Token *curr = lexer->head;
-
-    while (curr != NULL) {
-        Cearch_Token *next = curr->next;
-
-        if (curr->kind == CT_STR) free(curr->as_str.value);
-
-        free(curr);
-
-        curr = next;
-    }
+    arena_destroy(lexer->strs_arena);
+    arena_destroy(lexer->tokens_arena);
+    free(lexer);
 }
