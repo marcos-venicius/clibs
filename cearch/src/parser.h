@@ -6,9 +6,6 @@
 #include "./lexer.h"
 #include "./arena.h"
 
-#define MAX_FUNCTION_ARGUMENTS 32
-#define MAX_ARRAY_LENGTH 256
-
 typedef enum {
     ANT_NIL,
     ANT_INT,
@@ -53,13 +50,13 @@ struct Cearch_Ast_Node {
             Cearch_Ast_Node* self;
             Cearch_String    method_name;
 
-            Cearch_Ast_Node* arguments[MAX_FUNCTION_ARGUMENTS];
-            int              arguments_length;
+            Cearch_Ast_Node** arguments;
+            int               arguments_length;
         } as_method_call;
 
         struct {
-            Cearch_Ast_Node* elements[MAX_ARRAY_LENGTH];
-            int              elements_length;
+            Cearch_Ast_Node** elements;
+            int               elements_length;
         } as_array;
     };
 };

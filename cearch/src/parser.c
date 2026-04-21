@@ -8,6 +8,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#define MAX_FUNCTION_ARGUMENTS 32
+#define MAX_ARRAY_LENGTH 256
 #define PARSER_AST_ARENA_CAPACITY (sizeof(Cearch_Ast_Node) * 512)
 // 16 Kilobytes of memory should be enough to strings?
 #define PARSER_STRS_ARENA_CAPACITY (16 * 1024)
@@ -278,15 +280,20 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
 
     node->type = ANT_ARRAY;
     node->location = lbracket_token->location;
+    node->as_array.elements = NULL;
+    node->as_array.elements_length = 0;
 
     parser->last_successfull_parsed_token = peek_token(parser);
 
+    Cearch_Ast_Node* temp_elements[MAX_ARRAY_LENGTH];
+    int              temp_elements_length = 0;
+
     while (parser->tokens_head != NULL && parser->tokens_head->kind != CT_RSQUARE) {
-        if (node->as_array.elements_length >= MAX_ARRAY_LENGTH) {
+        if (temp_elements_length >= MAX_ARRAY_LENGTH) {
             throw_error_message(lbracket_token->location, "array exceeds maximum length of %d", MAX_ARRAY_LENGTH);
         }
 
-        node->as_array.elements[node->as_array.elements_length++] = parse_expression(parser, 0);
+        temp_elements[temp_elements_length++] = parse_expression(parser, 0);
 
         if (parser->tokens_head->kind == CT_COMMA) {
             parser->last_successfull_parsed_token = consume_token(parser); // eat the ','
@@ -313,6 +320,12 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
     }
 
     consume_token(parser); // eat ']'
+
+    if (temp_elements_length > 0) {
+        node->as_array.elements = clibs_arena_alloc(parser->ast_arena, temp_elements_length * sizeof(Cearch_Ast_Node*));
+        node->as_array.elements_length = temp_elements_length;
+        memcpy(node->as_array.elements, temp_elements, temp_elements_length * sizeof(Cearch_Ast_Node*));
+    }
     
     return node;
 }
@@ -340,6 +353,8 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
         .size = name_token->as_str.size
     };
     node->as_method_call.self = left;
+    node->as_method_call.arguments = NULL;
+    node->as_method_call.arguments_length = 0;
 
     // zero-argument methods don't need parenthesis
     if (peek_token(parser) != NULL && peek_token(parser)->kind == CT_LPAREN) {
@@ -348,13 +363,16 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
         parser->last_successfull_parsed_token = parser->tokens_head;
 
+        Cearch_Ast_Node* temp_arguments[MAX_FUNCTION_ARGUMENTS];
+        int              temp_arguments_length = 0;
+
         // parse until hit ')'
         while (peek_token(parser) != NULL && peek_token(parser)->kind != CT_RPAREN) {
-            if (node->as_method_call.arguments_length >= MAX_FUNCTION_ARGUMENTS) {
+            if (temp_arguments_length >= MAX_FUNCTION_ARGUMENTS) {
                 throw_error_message(name_token->location, "function exceeds maximum of %d arguments", MAX_FUNCTION_ARGUMENTS);
             }
 
-            node->as_method_call.arguments[node->as_method_call.arguments_length++] = parse_expression(parser, PREC_NONE);
+            temp_arguments[temp_arguments_length++] = parse_expression(parser, PREC_NONE);
 
             if (peek_token(parser)->kind == CT_COMMA) {
                 // eat ','
@@ -383,6 +401,13 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
         // eat ')'
         consume_token(parser);
+
+        if (temp_arguments_length > 0) {
+            node->as_method_call.arguments = clibs_arena_alloc(parser->ast_arena, temp_arguments_length * sizeof(Cearch_Ast_Node*));
+            node->as_method_call.arguments_length = temp_arguments_length;
+
+            memcpy(node->as_method_call.arguments, temp_arguments, temp_arguments_length * sizeof(Cearch_Ast_Node*));
+        }
     }
 
     return node;
