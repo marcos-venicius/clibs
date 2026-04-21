@@ -7,8 +7,8 @@
 #define TEST_LEXER(q) do                                                        \
 {                                                                               \
     printf("query: "q"\n");                                                     \
-    Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                     \
-    Cearch_Token *head = cearch_lex(lexer);                                    \
+    Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                    \
+    Cearch_Token *head = cearch_lex(lexer);                                     \
     if (head == NULL) {                                                         \
         printf("  (null)\n");                                                   \
     } else {                                                                    \
@@ -25,8 +25,21 @@
         }                                                                       \
     }                                                                           \
     printf("\n");                                                               \
-    cearch_lexer_free(lexer);                                                  \
+    cearch_lexer_free(lexer);                                                   \
 } while(0);
+
+#define TEST_PARSER(label, expression)                                              \
+    do {                                                                            \
+        printf("TEST_PARSER("label", \""expression"\"):\n");                                          \
+        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
+        Cearch_Token *head = cearch_lex(lexer);                                     \
+        Cearch_Parser *parser = cearch_create_parser(head);                         \
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);                     \
+        cearch_print_ast(ast, 2);                                                   \
+        cearch_free_parser(parser);                                                 \
+        cearch_lexer_free(lexer);                                                   \
+        printf("\n");                                                               \
+    } while (0)
 
 void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
     if (!node) return;
@@ -124,87 +137,10 @@ int main(void) {
     TEST_LEXER("'|Hello \\\\ world\\'s!\\t|\\n  |'");
     TEST_LEXER("''");
 
-    {
-        printf("001\n");
-
-        char *expression = "'  Hello. World  '.replace('.', ',').ltrim.rtrim().lower.debug";
-
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
-
-        Cearch_Token *head = cearch_lex(lexer);
-
-        Cearch_Parser *parser = cearch_create_parser(head);
-
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
-
-        cearch_print_ast(ast, 0);
-
-        cearch_free_parser(parser);
-        cearch_lexer_free(lexer);
-    }
-
-    printf("\n\n");
-
-    {
-        printf("002\n");
-
-        char *expression = "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'";
-
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
-
-        Cearch_Token *head = cearch_lex(lexer);
-
-        Cearch_Parser *parser = cearch_create_parser(head);
-
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
-
-        cearch_print_ast(ast, 0);
-
-        cearch_free_parser(parser);
-        cearch_lexer_free(lexer);
-    }
-
-    printf("\n\n");
-
-    {
-        printf("003\n");
-
-        char *expression = "(((!(false) or (!!true))))";
-
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
-
-        Cearch_Token *head = cearch_lex(lexer);
-
-        Cearch_Parser *parser = cearch_create_parser(head);
-
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
-
-        cearch_print_ast(ast, 0);
-
-        cearch_free_parser(parser);
-        cearch_lexer_free(lexer);
-    }
-
-    printf("\n\n");
-
-    {
-        printf("004\n");
-
-        char *expression = "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])";
-
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
-
-        Cearch_Token *head = cearch_lex(lexer);
-
-        Cearch_Parser *parser = cearch_create_parser(head);
-
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
-
-        cearch_print_ast(ast, 0);
-
-        cearch_free_parser(parser);
-        cearch_lexer_free(lexer);
-    }
+    TEST_PARSER("001",  "'  Hello. World  '.replace('.', ',').ltrim.rtrim().lower.debug");
+    TEST_PARSER("002",  "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'");
+    TEST_PARSER("003", "(((!(false) or (!!true))))");
+    TEST_PARSER("004", "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])");
 
     return 0;
 }
