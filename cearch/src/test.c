@@ -96,9 +96,12 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
 int main(void) {
     TEST_LEXER("");
     TEST_LEXER("1");
+    TEST_LEXER("-1");
     TEST_LEXER("\n                    \n\n\n\n1\n\n     ");
     TEST_LEXER("1.");
+    TEST_LEXER("-1.");
     TEST_LEXER("1.34");
+    TEST_LEXER("-1.34");
     TEST_LEXER("true");
     TEST_LEXER("false");
     TEST_LEXER("nil");

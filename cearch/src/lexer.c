@@ -149,6 +149,8 @@ static inline void append_token(Cearch_Lexer *lexer, Cearch_Token *token) {
 }
 
 static void lex_digit(Cearch_Lexer *lexer) {
+    advance_cursor(lexer);
+
     while (!is_empty(lexer) && is_digit(chr(lexer))) advance_cursor(lexer);
 
     bool is_float = false;
@@ -410,6 +412,7 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
         if (is_empty(lexer)) break;
 
         switch (chr(lexer)) {
+            case '-':
             case '0':
             case '1':
             case '2':
