@@ -1,6 +1,6 @@
 % Parse negative numbers
 
-.state todo
+.state doing
 .date 2026-04-20 19:45:56-03:00
 .tags important
 .remind
@@ -21,7 +21,7 @@
 
 % Add arena to the lexer
 
-.state doing
+.state done
 .date 2026-04-20 07:40:25-03:00
 .tags
 .remind
