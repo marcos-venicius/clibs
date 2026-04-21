@@ -2,6 +2,19 @@ Cearch Language.
 
 Language Design:
 
+    Data Types:
+
+        nil:                nil                 represents a non-existent data. imagine like C stdio NULL.
+        array:              [1, 2, 3]           you cannot have mixed types arrays
+        float:              -?[0-9]+\.[0-9]*    C double
+        int:                -?[0-9]+            C int
+        bool:               true|false
+        str:                '.*'                C strings           (always heap allocated)
+                                                quote scaping       \'
+                                                line break escaping \n
+                                                tab escaping        \t
+                                                backslash escaping  \\
+
     Operators:
 
         not equal:          !=                  int, float, string, nil, bool
@@ -22,18 +35,6 @@ Language Design:
         true:               true
         false:              false
         nil:                nil
-
-    Data Types:
-
-        array:              [1, 2, 3]           you cannot have mixed types in an array
-        float:              [0-9]+\.[0-9]*      C double
-        int:                [0-9]+              C int
-        bool:               true|false
-        str:                '.*'                C strings           (always heap allocated)
-                                                quote scaping       \'
-                                                line break escaping \n
-                                                tab escaping        \t
-                                                backslash escaping  \\
 
     Functions:
 
