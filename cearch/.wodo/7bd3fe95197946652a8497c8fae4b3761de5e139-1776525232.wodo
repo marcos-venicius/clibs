@@ -7,7 +7,7 @@
 
 % Make the arguments and arrays dynamically allocated so we don't extrapolate the memory
 
-.state todo
+.state done
 .date 2026-04-20 19:38:03-03:00
 .tags
 .remind
