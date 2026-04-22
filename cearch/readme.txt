@@ -1,5 +1,65 @@
 Cearch Language.
 
+Ideas:
+  
+  FFI (draft):
+    It would be very cool if the user could use C functions to transform data during the query.
+    The user should provide the signature of the function and it's name.
+    Then, he would be able to call it later by linking his functions to the
+    compiler unit.
+
+    Some examples would be:
+
+    The user would need to specify the function signature, maybe via another place.
+    I mean, a different entry point that is not the query entry point.
+    It would be something like a preprocessing of FFI functions.
+
+    ```
+    // if left is greater than right returns 1
+    // if left is less than right returns -1
+    // if left is equal to right returns 0
+    @define(compare_dates(str, str): int);
+    ```
+
+    Then, the query would look like:
+    
+    ```
+    // so, this query basically searchs for any registers
+    // that starts at 2025-10-10 and ends at 2025-11-10
+    #compare_dates(created_at, '2025-10-10') >= 0 and #compare_dates(created_at, '2025-11-10') <= 0
+    ```
+
+    This would cause the program to call a function with a signature more or less like this:
+
+    `Cearch_Value compare_date(int args_count, Cearch_Value *args);`
+
+    Then, the user and the program would know which is the return type,
+    the arguments type and how many of then.
+
+    Since the user knows, the implementation could be something like:
+
+    ```
+    Cearch_Value compare_dates(int args_count, Cearch_Value *args) {
+      // null terminated strings. The struct would have { int size, char *value }
+      Cearch_Value left  = args[0].as_str;
+      Cearch_Value right = args[1].as_str;
+
+      int result = 0;
+
+      ... pseudo code
+      if (left.value == right.value) result = 0;
+      if (left.value >  right.value) result = 1;
+      if (left.value <  right.value) result = -1;
+
+      return (Cearch_Value){
+        .as_int = result
+      };
+    }
+    ```
+
+    Then, this would satisfies the program because by the previous load of the FFI file specfication
+    the program now knows the return type and will directly access `as_int` field.
+
 Language Design:
 
     Data Types:
