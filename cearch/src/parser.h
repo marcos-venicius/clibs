@@ -70,6 +70,7 @@ typedef struct {
     Cearch_Token *last_successfull_parsed_token;
 } Cearch_Parser;
 
+const char *cearch_parser_node_type_name(Cearch_Ast_Node_Type type);
 Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head);
 Cearch_Ast_Node *cearch_parse_expression(Cearch_Parser *parser);
 void cearch_free_parser(Cearch_Parser *parser);

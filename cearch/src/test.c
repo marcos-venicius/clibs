@@ -30,63 +30,67 @@
 
 #define TEST_PARSER(label, expression)                                              \
     do {                                                                            \
-        printf("TEST_PARSER("label", \""expression"\"):\n");                                          \
+        printf("TEST_PARSER("label", \""expression"\"):\n");                        \
         Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
         Cearch_Token *head = cearch_lex(lexer);                                     \
         Cearch_Parser *parser = cearch_create_parser(head);                         \
         Cearch_Ast_Node *ast = cearch_parse_expression(parser);                     \
-        cearch_print_ast(ast, 2);                                                   \
+        printf("remounted ast: ");                                                  \
+        print_ast_back_as_code(ast);                                                \
+        printf("\n");                                                               \
+        printf("ast graph:\n");                                                     \
+        cearch_print_ast(ast, 1);                                             \
         cearch_free_parser(parser);                                                 \
         cearch_lexer_free(lexer);                                                   \
-        printf("\n");                                                               \
+        printf("\n\n");                                                             \
     } while (0)
 
 void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
     if (!node) return;
 
     // 1. Print Indentation
-    for (int i = 0; i < depth; i++) printf("  │ ");
+    for (int i = 0; i < depth; i++) printf(" ");
 
     // 2. Handle Node Types
     switch (node->type) {
         case ANT_INT:
-            printf("INT: %d\n", node->as_int);
+            printf("int(%d)\n", node->as_int);
             break;
         case ANT_FLOAT:
-            printf("FLOAT: %f\n", node->as_float);
+            printf("float(%f)\n", node->as_float);
             break;
         case ANT_BOOL:
-            printf("BOOL: %s\n", node->as_bool ? "true" : "false");
+            printf("bool(%s)\n", node->as_bool ? "true" : "false");
             break;
         case ANT_STR:
-            printf("STR: \"%s\"\n", node->as_str.value);
+            printf("str('%s')\n", node->as_str.value);
             break;
         case ANT_IDENTIFIER:
-            printf("ID: %s\n", node->as_identifier.value);
+            printf("sym(%s)\n", node->as_identifier.value);
             break;
 
         case ANT_UNARY:
-            printf("UNARY_OP: %s\n", cearch_token_kind_name(node->as_unary.op));
+            printf("unary(%s):\n", cearch_token_kind_name(node->as_unary.op));
             cearch_print_ast(node->as_unary.operand, depth + 1);
             break;
 
         case ANT_BINARY:
-            printf("BINARY_OP: %s\n", cearch_token_kind_name(node->as_binary.op));
+            printf("binary(%s):\n", cearch_token_kind_name(node->as_binary.op));
             cearch_print_ast(node->as_binary.left, depth + 1);
             cearch_print_ast(node->as_binary.right, depth + 1);
             break;
 
         case ANT_METHOD_CALL:
-            printf("METHOD_CALL: .%s\n", node->as_method_call.method_name.value);
+            printf("call(.%s):\n", node->as_method_call.method_name.value);
             // Print 'self' (the object the method is called on)
-            for (int i = 0; i <= depth; i++) printf("  │ ");
-            printf("SELF:\n");
+            for (int i = 0; i <= depth; i++) printf(" ");
+            printf("self:\n");
             cearch_print_ast(node->as_method_call.self, depth + 2);
             
             // Print arguments
             if (node->as_method_call.arguments_length > 0) {
-                for (int i = 0; i <= depth; i++) printf("  │ ");
-                printf("ARGS:\n");
+                for (int i = 0; i <= depth; i++) printf(" ");
+                printf("args: \n");
                 for (int i = 0; i < node->as_method_call.arguments_length; i++) {
                     cearch_print_ast(node->as_method_call.arguments[i], depth + 2);
                 }
@@ -94,7 +98,7 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
             break;
 
         case ANT_ARRAY:
-            printf("ARRAY: [%d elements]\n", node->as_array.elements_length);
+            printf("array(len: %d):\n", node->as_array.elements_length);
             for (int i = 0; i < node->as_array.elements_length; i++) {
                 cearch_print_ast(node->as_array.elements[i], depth + 1);
             }
@@ -106,7 +110,97 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
     }
 }
 
-int main(void) {
+void print_ast_back_as_code(Cearch_Ast_Node *node) {
+    switch (node->type) {
+        case ANT_NIL:
+            printf("nil");
+            break;
+        case ANT_INT:
+            printf("%d", node->as_int);
+            break;
+        case ANT_FLOAT:
+            printf("%f", node->as_float);
+            break;
+        case ANT_BOOL:
+            printf("%s", node->as_bool ? "true" : "false");
+            break;
+        case ANT_STR:
+            printf("'%.*s'", node->as_str.size, node->as_str.value);
+            break;
+        case ANT_ARRAY:
+            printf("[");
+            for (int i = 0; i < node->as_array.elements_length; ++i) {
+                if (i > 0) printf(", ");
+
+                print_ast_back_as_code(node->as_array.elements[i]);
+            }
+            printf("]");
+            break;
+        case ANT_IDENTIFIER:
+            printf("%.*s", node->as_identifier.size, node->as_identifier.value);
+            break;
+        case ANT_METHOD_CALL:
+            print_ast_back_as_code(node->as_method_call.self);
+            printf(".");
+            printf("%.*s", node->as_method_call.method_name.size, node->as_method_call.method_name.value);
+
+            if (node->as_method_call.arguments_length > 0) {
+                printf("(");
+                for (int i = 0; i < node->as_method_call.arguments_length; ++i) {
+                    if (i > 0) printf(", ");
+
+                    print_ast_back_as_code(node->as_method_call.arguments[i]);
+                }
+                printf(")");
+            }
+            break;
+        case ANT_BINARY:
+            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf("(");
+            print_ast_back_as_code(node->as_binary.left);
+            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf(")");
+
+            printf(" %s ", cearch_token_kind_name(node->as_binary.op));
+
+            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf("(");
+            print_ast_back_as_code(node->as_binary.right);
+            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf(")");
+            break;
+        case ANT_UNARY:
+            printf("%s", cearch_token_kind_name(node->as_unary.op));
+            printf("(");
+            print_ast_back_as_code(node->as_unary.operand);
+            printf(")");
+            break;
+        default:
+            printf("%s", cearch_parser_node_type_name(node->type));
+            break;
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc > 2) {
+        printf("usage: %s [query]\n", *argv);
+        return 1;
+    }
+
+    if (argc == 2) {
+        char *expression = *(argv + 1);
+
+        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
+        Cearch_Token *head = cearch_lex(lexer);
+        Cearch_Parser *parser = cearch_create_parser(head);
+        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
+        printf("\nast back to code: ");
+        print_ast_back_as_code(ast);
+        printf("\n\nast tree:\n");
+        cearch_print_ast(ast, 1);
+        cearch_free_parser(parser);
+        cearch_lexer_free(lexer);
+        printf("\n");                                                               \
+
+        return 0;
+    }
+
     TEST_LEXER("");
     TEST_LEXER("1");
     TEST_LEXER("-1");

@@ -251,14 +251,14 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
     Cearch_Parse_Rule *rule = get_rule(operator->kind);
 
-    // prevent against chained operator like '1 > 2 > 3'
+    /* // prevent against chained operator like '1 > 2 > 3'
     if (left->type == ANT_BINARY && get_rule(left->as_binary.op)->precedence == rule->precedence) {
         throw_error_message(
             operator->location,
             "operator '%s' cannot be chained",
             cearch_token_kind_name(operator->kind)
         );
-    }
+    } */
 
     Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
 
@@ -411,6 +411,22 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     }
 
     return node;
+}
+
+const char *cearch_parser_node_type_name(Cearch_Ast_Node_Type type)
+{
+    switch (type) {
+        case ANT_NIL: return "nil";
+        case ANT_INT: return "int";
+        case ANT_FLOAT: return "float";
+        case ANT_STR: return "str";
+        case ANT_BOOL: return "bool";
+        case ANT_ARRAY: return "array";
+        case ANT_IDENTIFIER: return "identifier";
+        case ANT_UNARY: return "unary";
+        case ANT_BINARY: return "binary";
+        case ANT_METHOD_CALL: return "method_call";
+    }
 }
 
 Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head) {
