@@ -52,7 +52,7 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
     for (int i = 0; i < depth; i++) printf(" ");
 
     // 2. Handle Node Types
-    switch (node->type) {
+    switch (node->kind) {
         case ANT_INT:
             printf("int(%d)\n", node->as_int);
             break;
@@ -111,7 +111,7 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
 }
 
 void print_ast_back_as_code(Cearch_Ast_Node *node) {
-    switch (node->type) {
+    switch (node->kind) {
         case ANT_NIL:
             printf("nil");
             break;
@@ -172,7 +172,7 @@ void print_ast_back_as_code(Cearch_Ast_Node *node) {
             printf(")");
             break;
         default:
-            printf("%s", cearch_parser_node_type_name(node->type));
+            printf("%s", cearch_parser_node_type_name(node->kind));
             break;
     }
 }

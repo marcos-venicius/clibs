@@ -118,18 +118,18 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
 
     switch (token->kind) {
         case CT_NIL:
-            node->type = ANT_NIL;
+            node->kind = ANT_NIL;
             break;
         case CT_INT:
-            node->type = ANT_INT;
+            node->kind = ANT_INT;
             node->as_int = token->as_int;
             break;
         case CT_FLOAT:
-            node->type = ANT_FLOAT;
+            node->kind = ANT_FLOAT;
             node->as_float = token->as_float;
             break;
         case CT_BOOL:
-            node->type = ANT_BOOL;
+            node->kind = ANT_BOOL;
             node->as_bool = token->as_bool;
             break;
         case CT_STR: {
@@ -139,7 +139,7 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
 
             str[token->as_str.size] = '\0';
 
-            node->type = ANT_STR;
+            node->kind = ANT_STR;
             node->as_str = (Cearch_String){
                 .size = token->as_str.size,
                 .value = str
@@ -188,7 +188,7 @@ static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
     Cearch_Ast_Node *operand = parse_expression(parser, PREC_UNARY);
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
-    node->type = ANT_UNARY;
+    node->kind = ANT_UNARY;
     node->location = operator_token->location;
 
     node->as_unary.op = operator_token->kind;
@@ -205,7 +205,7 @@ static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
     parser->last_successfull_parsed_token = token;
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
-    node->type = ANT_IDENTIFIER;
+    node->kind = ANT_IDENTIFIER;
     node->location = token->location;
 
     char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
@@ -263,7 +263,7 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
     Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
-    node->type = ANT_BINARY;
+    node->kind = ANT_BINARY;
     node->location = left->location;
 
     node->as_binary.left = left;
@@ -278,7 +278,7 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
 
-    node->type = ANT_ARRAY;
+    node->kind = ANT_ARRAY;
     node->location = lbracket_token->location;
     node->as_array.elements = NULL;
     node->as_array.elements_length = 0;
@@ -346,7 +346,7 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     method_name[name_token->as_str.size] = '\0';
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
-    node->type = ANT_METHOD_CALL;
+    node->kind = ANT_METHOD_CALL;
     node->location = dot_token->location;
     node->as_method_call.method_name = (Cearch_String){
         .value = method_name,
@@ -413,7 +413,7 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     return node;
 }
 
-const char *cearch_parser_node_type_name(Cearch_Ast_Node_Type type)
+const char *cearch_parser_node_type_name(Cearch_Ast_Expr_Kind type)
 {
     switch (type) {
         case ANT_NIL: return "nil";
@@ -426,6 +426,7 @@ const char *cearch_parser_node_type_name(Cearch_Ast_Node_Type type)
         case ANT_UNARY: return "unary";
         case ANT_BINARY: return "binary";
         case ANT_METHOD_CALL: return "method_call";
+        default: assert(0 && "cearch_parser_node_type_name: missing Cearch_Ast_Node_Type handling"); break;
     }
 }
 
