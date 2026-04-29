@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+// the order of the fields matters
 typedef enum {
     CDTK_NIL,
     CDTK_INT,
@@ -16,12 +17,13 @@ typedef struct Cearch_Data_Type Cearch_Data_Type;
 
 struct Cearch_Data_Type {
     Cearch_Data_Type_Kind kind;
+    bool nullable;
 
     // only used if kind is CDTK_ARRAY
     Cearch_Data_Type *inner;
 };
 
-bool cearch_compare_types(Cearch_Data_Type *left, Cearch_Data_Type *right);
 void cearch_printf_type(Cearch_Data_Type *type);
+Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *type_strig);
 
 #endif // _CEARCH_TYPES_H_

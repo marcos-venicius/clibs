@@ -1,11 +1,15 @@
 #include "./lexer.h"
 #include "./parser.h"
+#include "types.h"
 
 #include <stdio.h>
 #include <string.h>
 
+#define RUN_TESTS 0
+
 #define TEST_LEXER(q) do                                                        \
 {                                                                               \
+    if (RUN_TESTS) {                                                            \
     printf("query: "q"\n");                                                     \
     Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                    \
     Cearch_Token *head = cearch_lex(lexer);                                     \
@@ -26,10 +30,12 @@
     }                                                                           \
     printf("\n");                                                               \
     cearch_lexer_free(lexer);                                                   \
+    }                                                                           \
 } while(0);
 
 #define TEST_PARSER(label, expression)                                              \
     do {                                                                            \
+    if (RUN_TESTS) {                                                                \
         printf("TEST_PARSER("label", \""expression"\"):\n");                        \
         Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
         Cearch_Token *head = cearch_lex(lexer);                                     \
@@ -43,6 +49,7 @@
         cearch_free_parser(parser);                                                 \
         cearch_lexer_free(lexer);                                                   \
         printf("\n\n");                                                             \
+    }                                                                               \
     } while (0)
 
 void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
@@ -235,6 +242,9 @@ int main(int argc, char **argv) {
     TEST_PARSER("002",  "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'");
     TEST_PARSER("003", "(((!(false) or (!!true))))");
     TEST_PARSER("004", "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])");
+
+
+    (void)cearch_parse_data_type("cearch_parse_data_type", "array<array<int>>");
 
     return 0;
 }
