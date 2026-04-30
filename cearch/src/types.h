@@ -1,6 +1,8 @@
 #ifndef _CEARCH_TYPES_H_
 #define _CEARCH_TYPES_H_
 
+#include "./arena.h"
+
 #include <stdbool.h>
 
 // the order of the fields matters
@@ -25,6 +27,6 @@ struct Cearch_Data_Type {
 
 void cearch_printf_type(Cearch_Data_Type *type);
 // This function is not thread safe because it store global state
-Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *type_strig);
+Cearch_Data_Type *cearch_parse_data_type(Clibs_Arena *allocator, const char *function_name, const char *type_strig);
 
 #endif // _CEARCH_TYPES_H_

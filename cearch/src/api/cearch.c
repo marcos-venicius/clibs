@@ -1,5 +1,6 @@
 #include "./cearch.h"
 #include "../types.h"
+#include "../arena.h"
 #define HT_IMPLEMENTATION
 #include "../ht.h"
 
@@ -9,6 +10,7 @@
 
 struct Cearch {
     Ht(const char *, Cearch_Data_Type*) variables;
+    Clibs_Arena *dtypes_arena;
 };
 
 static void display_error_and_exit(const char *type_string, const char *func_name, const char *message, const char *description, int start, int end, ...) {
@@ -52,6 +54,7 @@ Cearch *cearch_init(void) {
     Cearch *cearch = calloc(1, sizeof(Cearch));
 
     cearch->variables.hasheq = ht_cstr_hasheq;
+    cearch->dtypes_arena = clibs_arena_create(sizeof(Cearch_Data_Type) * 512);
 
     return cearch;
 }
@@ -71,7 +74,7 @@ void cearch_define_variable(Cearch *cearch, const char *variable_name, const cha
     }
 
     // cearch_parse_data_type are going to exit in case it fails
-    Cearch_Data_Type *dtype = cearch_parse_data_type("cearch_define_variable", variable_type);
+    Cearch_Data_Type *dtype = cearch_parse_data_type(cearch->dtypes_arena, "cearch_define_variable", variable_type);
 
     *ht_put(&cearch->variables, variable_name) = dtype;
 }
@@ -82,4 +85,10 @@ void cearch_debug_variables(Cearch *cearch) {
         cearch_printf_type(*value);
         printf("\n");
     }
+}
+
+void cearch_free(Cearch *cearch) {
+    clibs_arena_destroy(cearch->dtypes_arena);
+    ht_free(&cearch->variables);
+    free(cearch);
 }

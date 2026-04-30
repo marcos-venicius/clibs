@@ -65,16 +65,16 @@ static struct {
     int cursor;
 } parser = {0};
 
-static Cearch_Data_Type *parse_top_level_type(const char *func_name, const char *type_string, bool accept_nullables);
+static Cearch_Data_Type *parse_top_level_type(Clibs_Arena *allocator, const char *func_name, const char *type_string, bool accept_nullables);
 
 static inline tk token() { return parser.tokens[parser.cursor]; }
 
-static Cearch_Data_Type *parse_primitive_type(const char *func_name, const char *type_string, bool accept_nullables) {
+static Cearch_Data_Type *parse_primitive_type(Clibs_Arena *allocator, bool accept_nullables) {
     tk type = token();
 
     parser.cursor++;
 
-    Cearch_Data_Type *dtype = malloc(sizeof(Cearch_Data_Type));
+    Cearch_Data_Type *dtype = clibs_arena_alloc(allocator, sizeof(Cearch_Data_Type));
 
     dtype->kind = (Cearch_Data_Type_Kind)type;
     dtype->inner = NULL;
@@ -90,7 +90,7 @@ static Cearch_Data_Type *parse_primitive_type(const char *func_name, const char 
     return dtype;
 }
 
-static Cearch_Data_Type *parse_array_type(const char *func_name, const char *type_string) {
+static Cearch_Data_Type *parse_array_type(Clibs_Arena *allocator, const char *func_name, const char *type_string) {
     parser.cursor++;
 
     if (parser.cursor >= parser.tokens_length) {
@@ -103,11 +103,11 @@ static Cearch_Data_Type *parse_array_type(const char *func_name, const char *typ
 
     parser.cursor++;
 
-    Cearch_Data_Type *dtype = malloc(sizeof(Cearch_Data_Type));
+    Cearch_Data_Type *dtype = clibs_arena_alloc(allocator, sizeof(Cearch_Data_Type));
 
     dtype->kind = CDTK_ARRAY;
     dtype->nullable = false;
-    dtype->inner = parse_top_level_type(func_name, type_string, false);
+    dtype->inner = parse_top_level_type(allocator, func_name, type_string, false);
 
     if (parser.cursor >= parser.tokens_length || token() != tk_gt_type) {
         display_error_and_exit(type_string, func_name, "invalid type string", NULL, -1, -1);
@@ -118,7 +118,7 @@ static Cearch_Data_Type *parse_array_type(const char *func_name, const char *typ
     return dtype;
 }
 
-static Cearch_Data_Type *parse_top_level_type(const char *func_name, const char *type_string, bool accept_nullables) {
+static Cearch_Data_Type *parse_top_level_type(Clibs_Arena *allocator, const char *func_name, const char *type_string, bool accept_nullables) {
     tk first = token();
 
     switch (first) {
@@ -126,9 +126,9 @@ static Cearch_Data_Type *parse_top_level_type(const char *func_name, const char 
         case tk_int_type:
         case tk_float_type:
         case tk_bool_type:
-            return parse_primitive_type(func_name, type_string, accept_nullables);
+            return parse_primitive_type(allocator, accept_nullables);
         case tk_array_type:
-            return parse_array_type(func_name, type_string);
+            return parse_array_type(allocator, func_name, type_string);
         default:
             display_error_and_exit(
                 type_string,
@@ -174,7 +174,7 @@ void cearch_printf_type(Cearch_Data_Type *type) {
     if (type->nullable) printf("?");
 }
 
-Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *type_string) {
+Cearch_Data_Type *cearch_parse_data_type(Clibs_Arena *allocator, const char *function_name, const char *type_string) {
     parser.tokens_length = 0;
     parser.cursor = 0;
 
@@ -278,7 +278,7 @@ Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *
         );
     }
 
-    Cearch_Data_Type *dtype = parse_top_level_type(function_name, type_string, true);
+    Cearch_Data_Type *dtype = parse_top_level_type(allocator, function_name, type_string, true);
 
     if (parser.cursor < parser.tokens_length) {
         display_error_and_exit(

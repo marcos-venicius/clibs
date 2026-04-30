@@ -259,5 +259,9 @@ int main(int argc, char **argv) {
 
     cearch_debug_variables(cearch);
 
+    // free memory
+
+    cearch_free(cearch);
+
     return 0;
 }
