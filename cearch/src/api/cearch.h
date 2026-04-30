@@ -1,9 +1,9 @@
 #ifndef _CEARCH_API_H_
 #define _CEARCH_API_H_
 
-typedef struct _Cearch Cearch;
+typedef struct Cearch Cearch;
 
-Cearch cearch_init(void);
+Cearch *cearch_init(void);
 /**
  * How to describe variable types?
  *
@@ -27,5 +27,6 @@ Cearch cearch_init(void);
  * That syntax is invalid: "array<int>?", and that one too ""
  */
 void cearch_define_variable(Cearch *cearch, const char *variable_name, const char *variable_type);
+void cearch_debug_variables(Cearch *cearch);
 
 #endif // _CEARCH_API_H_

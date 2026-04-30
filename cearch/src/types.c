@@ -2,10 +2,12 @@
 #include "./arena.h"
 
 #include <stdarg.h>
+#include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <string.h>
 #include <stdlib.h>
+
+#define MAX_TOKENS 1024
 
 static inline bool is_type_name(char c) { return c >= 'a' && c <= 'z'; }
 static void display_error_and_exit(const char *type_string, const char *func_name, const char *message, const char *description, int start, int end, ...) {
@@ -45,6 +47,103 @@ static void display_error_and_exit(const char *type_string, const char *func_nam
     exit(1);
 }
 
+typedef enum {
+    tk_int_type   = CDTK_INT,
+    tk_float_type = CDTK_FLOAT,
+    tk_str_type   = CDTK_STR,
+    tk_bool_type  = CDTK_BOOL,
+    tk_array_type = CDTK_ARRAY,
+    tk_lt_type,
+    tk_gt_type,
+    tk_qmark_type,
+} tk;
+
+static struct {
+    tk tokens[MAX_TOKENS];
+    int tokens_length;
+
+    int cursor;
+} parser = {0};
+
+static Cearch_Data_Type *parse_top_level_type(const char *func_name, const char *type_string, bool accept_nullables);
+
+static inline tk token() { return parser.tokens[parser.cursor]; }
+
+static Cearch_Data_Type *parse_primitive_type(const char *func_name, const char *type_string, bool accept_nullables) {
+    tk type = token();
+
+    parser.cursor++;
+
+    Cearch_Data_Type *dtype = malloc(sizeof(Cearch_Data_Type));
+
+    dtype->kind = (Cearch_Data_Type_Kind)type;
+    dtype->inner = NULL;
+    dtype->nullable = false;
+
+    if (accept_nullables) {
+        if (parser.cursor < parser.tokens_length && token() == tk_qmark_type) {
+            dtype->nullable = true;
+            parser.cursor++;
+        }
+    }
+
+    return dtype;
+}
+
+static Cearch_Data_Type *parse_array_type(const char *func_name, const char *type_string) {
+    parser.cursor++;
+
+    if (parser.cursor >= parser.tokens_length) {
+        display_error_and_exit(type_string, func_name, "invalid type string", "missing array type", -1, -1);
+    }
+
+    if (token() != tk_lt_type) {
+        display_error_and_exit(type_string, func_name, "invalid type string", NULL, -1, -1);
+    }
+
+    parser.cursor++;
+
+    Cearch_Data_Type *dtype = malloc(sizeof(Cearch_Data_Type));
+
+    dtype->kind = CDTK_ARRAY;
+    dtype->nullable = false;
+    dtype->inner = parse_top_level_type(func_name, type_string, false);
+
+    if (parser.cursor >= parser.tokens_length || token() != tk_gt_type) {
+        display_error_and_exit(type_string, func_name, "invalid type string", NULL, -1, -1);
+    }
+
+    parser.cursor++;
+
+    return dtype;
+}
+
+static Cearch_Data_Type *parse_top_level_type(const char *func_name, const char *type_string, bool accept_nullables) {
+    tk first = token();
+
+    switch (first) {
+        case tk_str_type:
+        case tk_int_type:
+        case tk_float_type:
+        case tk_bool_type:
+            return parse_primitive_type(func_name, type_string, accept_nullables);
+        case tk_array_type:
+            return parse_array_type(func_name, type_string);
+        default:
+            display_error_and_exit(
+                type_string,
+                func_name,
+                "invalid type string",
+                "expected 'str', 'int', 'float', 'bool' or 'array'",
+                -1,
+                -1
+            );
+            break;
+    }
+
+    return NULL;
+}
+
 void cearch_printf_type(Cearch_Data_Type *type) {
     if (type == NULL) printf("(untyped)");
 
@@ -75,18 +174,10 @@ void cearch_printf_type(Cearch_Data_Type *type) {
     if (type->nullable) printf("?");
 }
 
-enum tk {
-    tk_int_type   = CDTK_INT,
-    tk_float_type = CDTK_FLOAT,
-    tk_str_type   = CDTK_STR,
-    tk_bool_type  = CDTK_BOOL,
-    tk_array_type = CDTK_ARRAY,
-    tk_lt_type,
-    tk_gt_type,
-    tk_qmark_type,
-};
-
 Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *type_string) {
+    parser.tokens_length = 0;
+    parser.cursor = 0;
+
     int length = strlen(type_string);
 
     static const int m = 16;                // deepest array level allowed
@@ -107,13 +198,10 @@ Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *
         );
     }
 
-    int tokens[max_amount_of_tokens];
-    int tokens_length = 0;
-
     int bot = 0, cursor = 0;
 
     while (cursor < length) {
-        if (tokens_length >= max_amount_of_tokens) {
+        if (parser.tokens_length >= max_amount_of_tokens) {
             display_error_and_exit(
                 type_string,
                 function_name,
@@ -130,26 +218,26 @@ Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *
         char c = type_string[cursor];
 
         if (c == '>') {
-            tokens[tokens_length++] = tk_gt_type;
+            parser.tokens[parser.tokens_length++] = tk_gt_type;
         } else if (c == '<') {
-            tokens[tokens_length++] = tk_lt_type;
+            parser.tokens[parser.tokens_length++] = tk_lt_type;
         } else if (c == '?') {
-            tokens[tokens_length++] = tk_qmark_type;
+            parser.tokens[parser.tokens_length++] = tk_qmark_type;
         } else if (is_type_name(c)) {
             while (cursor < length && is_type_name(type_string[cursor])) cursor++;
 
             int size = cursor - bot - 1;
 
             if (strncmp("array", type_string + bot, size) == 0) {
-                tokens[tokens_length++] = tk_array_type;
+                parser.tokens[parser.tokens_length++] = tk_array_type;
             } else if (strncmp("int", type_string + bot, size) == 0) {
-                tokens[tokens_length++] = tk_int_type;
+                parser.tokens[parser.tokens_length++] = tk_int_type;
             } else if (strncmp("str", type_string + bot, size) == 0) {
-                tokens[tokens_length++] = tk_str_type;
+                parser.tokens[parser.tokens_length++] = tk_str_type;
             } else if (strncmp("bool", type_string + bot, size) == 0) {
-                tokens[tokens_length++] = tk_bool_type;
+                parser.tokens[parser.tokens_length++] = tk_bool_type;
             } else if (strncmp("float", type_string + bot, size) == 0) {
-                tokens[tokens_length++] = tk_float_type;
+                parser.tokens[parser.tokens_length++] = tk_float_type;
             } else {
                 display_error_and_exit(
                     type_string,
@@ -179,7 +267,7 @@ Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *
         cursor++;
     }
 
-    if (tokens_length == 0) {
+    if (parser.tokens_length == 0) {
         display_error_and_exit(
             type_string,
             function_name,
@@ -190,5 +278,18 @@ Cearch_Data_Type *cearch_parse_data_type(const char *function_name, const char *
         );
     }
 
-    return NULL;
+    Cearch_Data_Type *dtype = parse_top_level_type(function_name, type_string, true);
+
+    if (parser.cursor < parser.tokens_length) {
+        display_error_and_exit(
+            type_string,
+            function_name,
+            "invalid type string",
+            "too much info",
+            -1,
+            -1
+        );
+    }
+
+    return dtype;
 }

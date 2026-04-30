@@ -21,7 +21,7 @@ $(EXE_NAME): $(OBJS) | $(BIN_DIR)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -o $@ $^
 
-$(BIN_DIR)/%.o: $(SRC_DIR)/%.c | $(BIN_DIR)
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 

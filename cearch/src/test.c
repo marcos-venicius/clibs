@@ -1,5 +1,6 @@
 #include "./lexer.h"
 #include "./parser.h"
+#include "./api/cearch.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -241,6 +242,22 @@ int main(int argc, char **argv) {
     TEST_PARSER("002",  "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'");
     TEST_PARSER("003", "(((!(false) or (!!true))))");
     TEST_PARSER("004", "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])");
+
+    Cearch *cearch = cearch_init();
+
+    // defining variables schema
+
+    cearch_define_variable(cearch, "method", "str");
+    cearch_define_variable(cearch, "status", "int");
+    cearch_define_variable(cearch, "user_agent", "str?");
+    cearch_define_variable(cearch, "request", "str?");
+    cearch_define_variable(cearch, "response", "str?");
+    cearch_define_variable(cearch, "stars", "array<bool>");
+    cearch_define_variable(cearch, "vector", "array<array<float>>");
+
+    // printing the schema to the stdout
+
+    cearch_debug_variables(cearch);
 
     return 0;
 }
