@@ -115,6 +115,7 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->location = token->location;
+    node->raw_string = token->content;
 
     switch (token->kind) {
         case CT_NIL:
@@ -190,6 +191,20 @@ static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->kind = ANT_UNARY;
     node->location = operator_token->location;
+    
+    Cearch_Token *curr_token = peek_token(parser);
+
+    if (curr_token) {
+        node->raw_string = (Cearch_String){
+            .value = operator_token->content.value,
+            .size = curr_token->content.value - operator_token->content.value,
+        };
+    } else {
+        node->raw_string = (Cearch_String){
+            .value = operator_token->content.value,
+            .size = parser->last_successfull_parsed_token->content.value - operator_token->content.value + parser->last_successfull_parsed_token->content.size,
+        };
+    }
 
     node->as_unary.op = operator_token->kind;
     node->as_unary.operand = operand;
@@ -207,6 +222,7 @@ static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->kind = ANT_IDENTIFIER;
     node->location = token->location;
+    node->raw_string = token->content;
 
     char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
     memcpy(str, token->as_str.value, token->as_str.size);
@@ -243,6 +259,11 @@ static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Pr
         left = infix_rule(parser, left);
     }
 
+    left->raw_string = (Cearch_String){
+        .value = token->content.value,
+        .size = parser->last_successfull_parsed_token->content.value - token->content.value + parser->last_successfull_parsed_token->content.size,
+    };
+
     return left;
 }
 
@@ -251,20 +272,15 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
 
     Cearch_Parse_Rule *rule = get_rule(operator->kind);
 
-    /* // prevent against chained operator like '1 > 2 > 3'
-    if (left->type == ANT_BINARY && get_rule(left->as_binary.op)->precedence == rule->precedence) {
-        throw_error_message(
-            operator->location,
-            "operator '%s' cannot be chained",
-            cearch_token_kind_name(operator->kind)
-        );
-    } */
-
     Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
 
     Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
     node->kind = ANT_BINARY;
     node->location = left->location;
+    node->raw_string = (Cearch_String){
+        .value = operator->content.value,
+        .size = parser->last_successfull_parsed_token->content.value - operator->content.value + parser->last_successfull_parsed_token->content.size,
+    };
 
     node->as_binary.left = left;
     node->as_binary.right = right;
@@ -319,7 +335,12 @@ static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
         throw_error_message(lbracket_token->location, "unterminated array, missing ']'");
     }
 
-    consume_token(parser); // eat ']'
+    Cearch_Token *rsquare = consume_token(parser); // eat ']'
+
+    node->raw_string = (Cearch_String){
+        .value = lbracket_token->content.value,
+        .size = rsquare->content.value - rsquare->content.value + rsquare->content.size,
+    };
 
     if (temp_elements_length > 0) {
         node->as_array.elements = clibs_arena_alloc(parser->ast_arena, temp_elements_length * sizeof(Cearch_Ast_Node*));
@@ -355,6 +376,8 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     node->as_method_call.self = left;
     node->as_method_call.arguments = NULL;
     node->as_method_call.arguments_length = 0;
+
+    Cearch_Token *last_method_call_expression_token = name_token;
 
     // zero-argument methods don't need parenthesis
     if (peek_token(parser) != NULL && peek_token(parser)->kind == CT_LPAREN) {
@@ -400,7 +423,7 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
         }
 
         // eat ')'
-        consume_token(parser);
+        last_method_call_expression_token = consume_token(parser);
 
         if (temp_arguments_length > 0) {
             node->as_method_call.arguments = clibs_arena_alloc(parser->ast_arena, temp_arguments_length * sizeof(Cearch_Ast_Node*));
@@ -409,6 +432,11 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
             memcpy(node->as_method_call.arguments, temp_arguments, temp_arguments_length * sizeof(Cearch_Ast_Node*));
         }
     }
+
+    node->raw_string = (Cearch_String){
+        .value = dot_token->content.value,
+        .size = last_method_call_expression_token->content.value - dot_token->content.value + last_method_call_expression_token->content.size,
+    };
 
     return node;
 }

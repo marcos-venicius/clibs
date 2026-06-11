@@ -61,6 +61,9 @@ struct Cearch_Ast_Node {
 
     Cearch_Location location;
 
+    // reference to the text itself of the node
+    Cearch_String raw_string;
+
     union {
         int           as_int;
         double        as_float;

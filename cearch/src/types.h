@@ -28,5 +28,6 @@ struct Cearch_Data_Type {
 void cearch_printf_type(Cearch_Data_Type *type);
 // This function is not thread safe because it store global state
 Cearch_Data_Type *cearch_parse_data_type(Clibs_Arena *allocator, const char *function_name, const char *type_strig);
+bool cearch_types_are_identical(Cearch_Data_Type *left, Cearch_Data_Type *right);
 
 #endif // _CEARCH_TYPES_H_

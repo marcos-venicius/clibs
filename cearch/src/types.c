@@ -145,7 +145,11 @@ static Cearch_Data_Type *parse_top_level_type(Clibs_Arena *allocator, const char
 }
 
 void cearch_printf_type(Cearch_Data_Type *type) {
-    if (type == NULL) printf("(untyped)");
+    if (type == NULL) {
+        printf("(untyped)");
+
+        return;
+    }
 
     switch (type->kind) {
         case CDTK_NIL:
@@ -172,6 +176,18 @@ void cearch_printf_type(Cearch_Data_Type *type) {
     }
 
     if (type->nullable) printf("?");
+}
+
+bool cearch_types_are_identical(Cearch_Data_Type *left, Cearch_Data_Type *right) {
+    if (left == right) return true;
+    if (left == NULL || right == NULL) return false;
+
+    if (left->kind != right->kind) return false;
+    if (left->nullable != right->nullable) return false;
+
+    if (left->kind == CDTK_ARRAY) return cearch_types_are_identical(left->inner, right->inner);
+
+    return true;
 }
 
 Cearch_Data_Type *cearch_parse_data_type(Clibs_Arena *allocator, const char *function_name, const char *type_string) {
@@ -226,7 +242,7 @@ Cearch_Data_Type *cearch_parse_data_type(Clibs_Arena *allocator, const char *fun
         } else if (is_type_name(c)) {
             while (cursor < length && is_type_name(type_string[cursor])) cursor++;
 
-            int size = cursor - bot - 1;
+            int size = cursor - bot;
 
             if (strncmp("array", type_string + bot, size) == 0) {
                 parser.tokens[parser.tokens_length++] = tk_array_type;

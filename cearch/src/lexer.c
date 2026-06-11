@@ -382,7 +382,7 @@ static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
 }
 
 
-Cearch_Lexer *cearch_create_lexer(char *content, size_t content_size) {
+Cearch_Lexer *cearch_create_lexer(const char *content, size_t content_size) {
     Cearch_Lexer *lexer = malloc(sizeof(Cearch_Lexer));
     Clibs_Arena *tokens_arena = clibs_arena_create(LEXER_TOKENS_ARENA_CAPACITY);
     Clibs_Arena *strs_arena = clibs_arena_create(LEXER_STRS_ARENA_CAPACITY);

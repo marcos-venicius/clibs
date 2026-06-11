@@ -3,7 +3,7 @@
 
 typedef struct {
     int size;
-    char *value;
+    const char *value;
 } Cearch_String;
 
 #endif // _CEARCH_STRING_H_

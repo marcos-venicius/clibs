@@ -27,6 +27,7 @@ Cearch *cearch_init(void);
  * That syntax is invalid: "array<int>?", and that one too ""
  */
 void cearch_define_variable(Cearch *cearch, const char *variable_name, const char *variable_type);
+void cearch_compile(Cearch *cearch, const char *expression);
 void cearch_debug_variables(Cearch *cearch);
 void cearch_free(Cearch *cearch);
 
