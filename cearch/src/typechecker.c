@@ -24,9 +24,9 @@ static void display_error_and_exit(Cearch_Ast_Node *node, const char *message, c
 
     if (start != -1 && end != -1) {
         if (start == end) {
-            fprintf(stderr, "%*.s^\n", padding + start + 1, "");
+            fprintf(stderr, "%*.s^\n", padding + start, "");
         } else if (end > start) {
-            fprintf(stderr, "%*.s", padding + start + 1, "");
+            fprintf(stderr, "%*.s", padding + start, "");
             for (int i = start; i < end; i++) {
                 fprintf(stderr, "~");
             }
@@ -101,14 +101,19 @@ void cearch_data_type_infer(Cearch_Ast_Node *ast, Ht *variable_types) {
         case ANT_ARRAY: 
             infer_array_data_type(ast, variable_types);
             break;
-        case ANT_IDENTIFIER:
-            ht_find(variable_types, ast->as_identifier.value);
-	    break;
+        case ANT_IDENTIFIER: {
+            Cearch_Data_Type *dtype = ht_find(variable_types, ast->as_identifier.value);
+
+            if (dtype == NULL)
+                display_error_and_exit(ast, "undefined variable", "variable '%.*s' does not exists", ast->as_identifier.size, ast->as_identifier.value);
+
+            ast->dtype = dtype;
+        } break;
         case ANT_UNARY:
-            break;            
+            break;
         case ANT_BINARY:
             break;            
         case ANT_METHOD_CALL:
-            break;            
+            break;
     }
 }

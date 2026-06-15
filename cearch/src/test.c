@@ -7,49 +7,49 @@
 
 #define RUN_TESTS 0
 
-#define TEST_LEXER(q) do                                                        \
-{                                                                               \
-    if (RUN_TESTS) {                                                            \
-    printf("query: "q"\n");                                                     \
-    Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                    \
-    Cearch_Token *head = cearch_lex(lexer);                                     \
-    if (head == NULL) {                                                         \
-        printf("  (null)\n");                                                   \
-    } else {                                                                    \
-        printf("  %s\n", cearch_token_kind_name(head->kind));                   \
-        switch (head->kind) {                                                   \
-            case CT_NIL: printf("  nil\n"); break;                              \
-            case CT_BOOL: printf(head->as_bool ? "  true" : "  false"); break;  \
-            case CT_INT: printf("  %d\n", head->as_int); break;                 \
-            case CT_FLOAT: printf("  %lf\n", head->as_float); break;            \
-            case CT_STR: printf("  %s\n", head->as_str.value); break;           \
-            default:                                                            \
-                printf("  %.*s\n", head->content.size, head->content.value);    \
-                break;                                                          \
-        }                                                                       \
-    }                                                                           \
-    printf("\n");                                                               \
-    cearch_lexer_free(lexer);                                                   \
-    }                                                                           \
+#define TEST_LEXER(q) do                                                            \
+{                                                                                   \
+    if (RUN_TESTS) {                                                                \
+        printf("query: "q"\n");                                                     \
+        Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                    \
+        Cearch_Token *head = cearch_lex(lexer);                                     \
+        if (head == NULL) {                                                         \
+            printf("  (null)\n");                                                   \
+        } else {                                                                    \
+            printf("  %s\n", cearch_token_kind_name(head->kind));                   \
+            switch (head->kind) {                                                   \
+                case CT_NIL: printf("  nil\n"); break;                              \
+                case CT_BOOL: printf(head->as_bool ? "  true" : "  false"); break;  \
+                case CT_INT: printf("  %d\n", head->as_int); break;                 \
+                case CT_FLOAT: printf("  %lf\n", head->as_float); break;            \
+                case CT_STR: printf("  %s\n", head->as_str.value); break;           \
+                default:                                                            \
+                    printf("  %.*s\n", head->content.size, head->content.value);    \
+                    break;                                                          \
+            }                                                                       \
+        }                                                                           \
+        printf("\n");                                                               \
+        cearch_lexer_free(lexer);                                                   \
+    }                                                                               \
 } while(0);
 
-#define TEST_PARSER(label, expression)                                              \
-    do {                                                                            \
-    if (RUN_TESTS) {                                                                \
-        printf("TEST_PARSER("label", \""expression"\"):\n");                        \
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
-        Cearch_Token *head = cearch_lex(lexer);                                     \
-        Cearch_Parser *parser = cearch_create_parser(head);                         \
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);                     \
-        printf("remounted ast: ");                                                  \
-        print_ast_back_as_code(ast);                                                \
-        printf("\n");                                                               \
-        printf("ast graph:\n");                                                     \
-        cearch_print_ast(ast, 1);                                             \
-        cearch_free_parser(parser);                                                 \
-        cearch_lexer_free(lexer);                                                   \
-        printf("\n\n");                                                             \
-    }                                                                               \
+#define TEST_PARSER(label, expression)                                                  \
+    do {                                                                                \
+        if (RUN_TESTS) {                                                                \
+            printf("TEST_PARSER("label", \""expression"\"):\n");                        \
+            Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
+            Cearch_Token *head = cearch_lex(lexer);                                     \
+            Cearch_Parser *parser = cearch_create_parser(head);                         \
+            Cearch_Ast_Node *ast = cearch_parse_expression(parser);                     \
+            printf("remounted ast: ");                                                  \
+            print_ast_back_as_code(ast);                                                \
+            printf("\n");                                                               \
+            printf("ast graph:\n");                                                     \
+            cearch_print_ast(ast, 1);                                                   \
+            cearch_free_parser(parser);                                                 \
+            cearch_lexer_free(lexer);                                                   \
+            printf("\n\n");                                                             \
+        }                                                                               \
     } while (0)
 
 void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
@@ -259,9 +259,12 @@ int main(int argc, char **argv) {
 
     cearch_debug_variables(cearch);
 
+    cearch_compile(cearch, "method = 'post' and starts.len = 5");
+
     // free memory
 
     cearch_free(cearch);
+
 
     return 0;
 }

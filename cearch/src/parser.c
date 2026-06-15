@@ -434,8 +434,8 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     }
 
     node->raw_string = (Cearch_String){
-        .value = dot_token->content.value,
-        .size = last_method_call_expression_token->content.value - dot_token->content.value + last_method_call_expression_token->content.size,
+        .value = left->raw_string.value,
+        .size = last_method_call_expression_token->content.value - left->raw_string.value + last_method_call_expression_token->content.size,
     };
 
     return node;

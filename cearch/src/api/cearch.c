@@ -92,7 +92,7 @@ void cearch_compile(Cearch *cearch, const char *expression) {
 
     Cearch_Ast_Node *ast = cearch_parse_expression(parser);
 
-    cearch_data_type_infer(ast, (void *)&cearch->variables);
+    cearch_data_type_infer(ast, cearch->variables);
 }
 
 void cearch_debug_variables(Cearch *cearch) {
