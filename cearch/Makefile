@@ -28,6 +28,9 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 $(BIN_DIR):
 	mkdir -p $@
 
+amalg: src/amalg.h
+	$(CC) $(CFLAGS) -o $(BIN_DIR)/amalg $(SRC_DIR)/amalg.h
+
 clean:
 	rm -rf $(BIN_DIR)
 
