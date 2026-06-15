@@ -1,18 +1,11 @@
-#include "./parser.h"
-#include "./arena.h"
-#include "./lexer.h"
-
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 
-#define MAX_FUNCTION_ARGUMENTS 32
-#define MAX_ARRAY_LENGTH 256
-#define PARSER_AST_ARENA_CAPACITY (sizeof(Cearch_Ast_Node) * 512)
-// 16 Kilobytes of memory should be enough to strings?
-#define PARSER_STRS_ARENA_CAPACITY (16 * 1024)
+#include "./parser.h"
 
 typedef enum {
     PREC_NONE,
@@ -23,74 +16,74 @@ typedef enum {
     PREC_UNARY,
     PREC_CALL,
     PREC_PRIMARY,
-} Cearch_Parser_Precedence;
+} cearch_parser_precedence_t;
 
-typedef Cearch_Ast_Node* (*Cearch_Parser_Prefix_Fn)(Cearch_Parser *parser);
-typedef Cearch_Ast_Node* (*Cearch_Parser_Infix_Fn)(Cearch_Parser *parser, Cearch_Ast_Node *left);
+typedef cearch_ast_node_t *(*cearch_parser_prefix_fn_t)(cearch_parser_t *parser);
+typedef cearch_ast_node_t *(*cearch_parser_infix_fn_t)(cearch_parser_t *parser, cearch_ast_node_t *left);
 
 typedef struct {
-    Cearch_Parser_Prefix_Fn prefix;
-    Cearch_Parser_Infix_Fn infix;
-    Cearch_Parser_Precedence precedence;
-} Cearch_Parse_Rule;
+    cearch_parser_prefix_fn_t prefix;
+    cearch_parser_infix_fn_t infix;
+    cearch_parser_precedence_t precedence;
+} cearch_parse_rule_t;
 
 // forward declarations
-static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser);
-static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser);
-static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser);
-static Cearch_Ast_Node *parse_array(Cearch_Parser *parser);
-static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Precedence precedence);
-static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *left);
-static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *left);
-static Cearch_Ast_Node *parse_group(Cearch_Parser *parser);
+static cearch_ast_node_t *parse_unary(cearch_parser_t *parser);
+static cearch_ast_node_t *parse_literal(cearch_parser_t *parser);
+static cearch_ast_node_t *parse_identifier(cearch_parser_t *parser);
+static cearch_ast_node_t *parse_array(cearch_parser_t *parser);
+static cearch_ast_node_t *parse_expression(cearch_parser_t *parser, cearch_parser_precedence_t precedence);
+static cearch_ast_node_t *parse_binary(cearch_parser_t *parser, cearch_ast_node_t *left);
+static cearch_ast_node_t *parse_method(cearch_parser_t *parser, cearch_ast_node_t *left);
+static cearch_ast_node_t *parse_group(cearch_parser_t *parser);
 
-static Cearch_Parse_Rule parsing_rules[] = {
+static cearch_parse_rule_t parsing_rules[] = {
     // literals and identifiers
-    [CT_INT]        = {parse_literal,       NULL,           PREC_NONE},
-    [CT_FLOAT]      = {parse_literal,       NULL,           PREC_NONE},
-    [CT_STR]        = {parse_literal,       NULL,           PREC_NONE},
-    [CT_BOOL]       = {parse_literal,       NULL,           PREC_NONE},
-    [CT_NIL]        = {parse_literal,       NULL,           PREC_NONE},
-    [CT_SYM]        = {parse_identifier,    NULL,           PREC_NONE},
-    [CT_LSQUARE]    = {parse_array,         NULL,           PREC_NONE},
-    [CT_LPAREN]     = {parse_group,         NULL,           PREC_NONE},
+    [CTK_INT]        = {parse_literal,       NULL,           PREC_NONE},
+    [CTK_FLOAT]      = {parse_literal,       NULL,           PREC_NONE},
+    [CTK_STR]        = {parse_literal,       NULL,           PREC_NONE},
+    [CTK_BOOL]       = {parse_literal,       NULL,           PREC_NONE},
+    [CTK_NIL]        = {parse_literal,       NULL,           PREC_NONE},
+    [CTK_SYM]        = {parse_identifier,    NULL,           PREC_NONE},
+    [CTK_LSQUARE]    = {parse_array,         NULL,           PREC_NONE},
+    [CTK_LPAREN]     = {parse_group,         NULL,           PREC_NONE},
 
     // unary operators
-    [CT_NOT]        = {parse_unary,         NULL,           PREC_NONE},
+    [CTK_NOT]        = {parse_unary,         NULL,           PREC_NONE},
 
     // infix operators
-    [CT_AND]        = {NULL,                parse_binary,   PREC_AND},
-    [CT_OR]         = {NULL,                parse_binary,   PREC_OR},
-    [CT_EQ]         = {NULL,                parse_binary,   PREC_EQ},
-    [CT_NEQ]        = {NULL,                parse_binary,   PREC_EQ},
-    [CT_GT]         = {NULL,                parse_binary,   PREC_COMPARISON},
-    [CT_LT]         = {NULL,                parse_binary,   PREC_COMPARISON},
-    [CT_GTE]        = {NULL,                parse_binary,   PREC_COMPARISON},
-    [CT_LTE]        = {NULL,                parse_binary,   PREC_COMPARISON},
+    [CTK_AND]        = {NULL,                parse_binary,   PREC_AND},
+    [CTK_OR]         = {NULL,                parse_binary,   PREC_OR},
+    [CTK_EQ]         = {NULL,                parse_binary,   PREC_EQ},
+    [CTK_NEQ]        = {NULL,                parse_binary,   PREC_EQ},
+    [CTK_GT]         = {NULL,                parse_binary,   PREC_COMPARISON},
+    [CTK_LT]         = {NULL,                parse_binary,   PREC_COMPARISON},
+    [CTK_GTE]        = {NULL,                parse_binary,   PREC_COMPARISON},
+    [CTK_LTE]        = {NULL,                parse_binary,   PREC_COMPARISON},
 
-    [CT_DOT]        = {NULL,                parse_method,   PREC_CALL},
+    [CTK_DOT]        = {NULL,                parse_method,   PREC_CALL},
 };
 
-static inline Cearch_Parse_Rule *get_rule(Cearch_Token_Kind kind) {
+static inline cearch_parse_rule_t *parser_get_rule(cearch_token_kind_enum_t kind) {
     return &parsing_rules[kind];
 }
 
-static bool is_empty(Cearch_Parser *parser) {
-    return parser->tokens_head == NULL || parser->tokens_head->kind == CT_EOF;
+static bool parser_is_empty(cearch_parser_t *parser) {
+    return parser->tokens_head == NULL || parser->tokens_head->kind == CTK_EOF;
 }
 
-static inline Cearch_Token *peek_token(Cearch_Parser *parser) {
+static inline cearch_token_t *parser_peek_token(cearch_parser_t *parser) {
     return parser->tokens_head;
 }
 
-static inline Cearch_Token *consume_token(Cearch_Parser *parser) {
-    if (is_empty(parser)) return NULL;
-    Cearch_Token *curr = parser->tokens_head;
+static inline cearch_token_t *parser_consume_token(cearch_parser_t *parser) {
+    if (parser_is_empty(parser)) return NULL;
+    cearch_token_t *curr = parser->tokens_head;
     parser->tokens_head = parser->tokens_head->next;
     return curr;
 }
 
-static void throw_error_message(Cearch_Location location, const char *fmt, ...) {
+static void parser_throw_error_message(cearch_location_t location, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -108,49 +101,49 @@ static void throw_error_message(Cearch_Location location, const char *fmt, ...) 
     exit(1);
 }
 
-static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
-    Cearch_Token *token = consume_token(parser);
+static cearch_ast_node_t *parse_literal(cearch_parser_t *parser) {
+    cearch_token_t *token = parser_consume_token(parser);
 
     if (!token) return NULL;
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
     node->location = token->location;
     node->raw_string = token->content;
 
     switch (token->kind) {
-        case CT_NIL:
+        case CTK_NIL:
             node->kind = ANT_NIL;
             break;
-        case CT_INT:
+        case CTK_INT:
             node->kind = ANT_INT;
             node->as_int = token->as_int;
             break;
-        case CT_FLOAT:
+        case CTK_FLOAT:
             node->kind = ANT_FLOAT;
             node->as_float = token->as_float;
             break;
-        case CT_BOOL:
+        case CTK_BOOL:
             node->kind = ANT_BOOL;
             node->as_bool = token->as_bool;
             break;
-        case CT_STR: {
-            char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
+        case CTK_STR: {
+            char *str = cearch_arena_alloc(parser->strs_arena, token->as_str.size + 1);
 
             memcpy(str, token->as_str.value, token->as_str.size);
 
             str[token->as_str.size] = '\0';
 
             node->kind = ANT_STR;
-            node->as_str = (Cearch_String){
+            node->as_str = (cearch_string_t){
                 .size = token->as_str.size,
                 .value = str
             };
         } break;
         default:
-            throw_error_message(
+            parser_throw_error_message(
                 token->location,
                 "invalid syntax: expected nil, int, float, str or bool but got %s",
-                cearch_token_kind_name(token->kind)
+                cearch_token_kind_enum_name(token->kind)
             );
             break;
     }
@@ -160,47 +153,47 @@ static Cearch_Ast_Node *parse_literal(Cearch_Parser *parser) {
     return node;
 }
 
-static Cearch_Ast_Node *parse_group(Cearch_Parser *parser) {
+static cearch_ast_node_t *parse_group(cearch_parser_t *parser) {
     // eat '('
-    Cearch_Token *lparen = consume_token(parser);
+    cearch_token_t *lparen = parser_consume_token(parser);
 
     parser->last_successfull_parsed_token = lparen;
 
-    Cearch_Ast_Node *node = parse_expression(parser, PREC_NONE);
+    cearch_ast_node_t *node = parse_expression(parser, PREC_NONE);
 
-    Cearch_Token *next = peek_token(parser);
+    cearch_token_t *next = parser_peek_token(parser);
 
-    if (next == NULL || next->kind != CT_RPAREN) {
-        throw_error_message(lparen->location, "unterminated group, expected ')'");
+    if (next == NULL || next->kind != CTK_RPAREN) {
+        parser_throw_error_message(lparen->location, "unterminated group, expected ')'");
     }
 
     // eat ')'
-    parser->last_successfull_parsed_token = consume_token(parser);
+    parser->last_successfull_parsed_token = parser_consume_token(parser);
 
     return node;
 }
 
-static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
+static cearch_ast_node_t *parse_unary(cearch_parser_t *parser) {
     // eat '!'
-    Cearch_Token *operator_token = consume_token(parser);
+    cearch_token_t *operator_token = parser_consume_token(parser);
 
     parser->last_successfull_parsed_token = operator_token;
 
-    Cearch_Ast_Node *operand = parse_expression(parser, PREC_UNARY);
+    cearch_ast_node_t *operand = parse_expression(parser, PREC_UNARY);
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
     node->kind = ANT_UNARY;
     node->location = operator_token->location;
     
-    Cearch_Token *curr_token = peek_token(parser);
+    cearch_token_t *curr_token = parser_peek_token(parser);
 
     if (curr_token) {
-        node->raw_string = (Cearch_String){
+        node->raw_string = (cearch_string_t){
             .value = operator_token->content.value,
             .size = curr_token->content.value - operator_token->content.value,
         };
     } else {
-        node->raw_string = (Cearch_String){
+        node->raw_string = (cearch_string_t){
             .value = operator_token->content.value,
             .size = parser->last_successfull_parsed_token->content.value - operator_token->content.value + parser->last_successfull_parsed_token->content.size,
         };
@@ -212,23 +205,23 @@ static Cearch_Ast_Node *parse_unary(Cearch_Parser *parser) {
     return node;
 }
 
-static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
-    Cearch_Token *token = consume_token(parser);
+static cearch_ast_node_t *parse_identifier(cearch_parser_t *parser) {
+    cearch_token_t *token = parser_consume_token(parser);
 
     if (!token) return NULL;
 
     parser->last_successfull_parsed_token = token;
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
     node->kind = ANT_IDENTIFIER;
     node->location = token->location;
     node->raw_string = token->content;
 
-    char *str = clibs_arena_alloc(parser->strs_arena, token->as_str.size + 1);
+    char *str = cearch_arena_alloc(parser->strs_arena, token->as_str.size + 1);
     memcpy(str, token->as_str.value, token->as_str.size);
     str[token->as_str.size] = '\0';
 
-    node->as_identifier = (Cearch_String){
+    node->as_identifier = (cearch_string_t){
         .value = str,
         .size = token->as_str.size
     };
@@ -236,30 +229,30 @@ static Cearch_Ast_Node *parse_identifier(Cearch_Parser *parser) {
     return node;
 }
 
-static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Precedence precedence) {
-    Cearch_Token *token = peek_token(parser);
+static cearch_ast_node_t *parse_expression(cearch_parser_t *parser, cearch_parser_precedence_t precedence) {
+    cearch_token_t *token = parser_peek_token(parser);
 
     if (!token) return NULL;
 
-    Cearch_Parser_Prefix_Fn prefix_rule = get_rule(token->kind)->prefix;
+    cearch_parser_prefix_fn_t prefix_rule = parser_get_rule(token->kind)->prefix;
 
     if (prefix_rule == NULL) {
-        throw_error_message(token->location, "expected expression");
+        parser_throw_error_message(token->location, "expected expression");
     }
 
-    Cearch_Ast_Node *left = prefix_rule(parser);
+    cearch_ast_node_t *left = prefix_rule(parser);
 
     parser->last_successfull_parsed_token = parser->tokens_head;
 
-    while (peek_token(parser) != NULL && precedence < get_rule(peek_token(parser)->kind)->precedence) {
-        token = peek_token(parser);
+    while (parser_peek_token(parser) != NULL && precedence < parser_get_rule(parser_peek_token(parser)->kind)->precedence) {
+        token = parser_peek_token(parser);
 
-        Cearch_Parser_Infix_Fn infix_rule = get_rule(token->kind)->infix;
+        cearch_parser_infix_fn_t infix_rule = parser_get_rule(token->kind)->infix;
 
         left = infix_rule(parser, left);
     }
 
-    left->raw_string = (Cearch_String){
+    left->raw_string = (cearch_string_t){
         .value = token->content.value,
         .size = parser->last_successfull_parsed_token->content.value - token->content.value + parser->last_successfull_parsed_token->content.size,
     };
@@ -267,17 +260,17 @@ static Cearch_Ast_Node *parse_expression(Cearch_Parser *parser, Cearch_Parser_Pr
     return left;
 }
 
-static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *left) {
-    Cearch_Token *operator = consume_token(parser);
+static cearch_ast_node_t *parse_binary(cearch_parser_t *parser, cearch_ast_node_t *left) {
+    cearch_token_t *operator = parser_consume_token(parser);
 
-    Cearch_Parse_Rule *rule = get_rule(operator->kind);
+    cearch_parse_rule_t *rule = parser_get_rule(operator->kind);
 
-    Cearch_Ast_Node *right = parse_expression(parser, rule->precedence);
+    cearch_ast_node_t *right = parse_expression(parser, rule->precedence);
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
     node->kind = ANT_BINARY;
     node->location = left->location;
-    node->raw_string = (Cearch_String){
+    node->raw_string = (cearch_string_t){
         .value = operator->content.value,
         .size = parser->last_successfull_parsed_token->content.value - operator->content.value + parser->last_successfull_parsed_token->content.size,
     };
@@ -289,87 +282,87 @@ static Cearch_Ast_Node *parse_binary(Cearch_Parser *parser, Cearch_Ast_Node *lef
     return node;
 }
 
-static Cearch_Ast_Node *parse_array(Cearch_Parser *parser) {
-    Cearch_Token *lbracket_token = consume_token(parser);
+static cearch_ast_node_t *parse_array(cearch_parser_t *parser) {
+    cearch_token_t *lbracket_token = parser_consume_token(parser);
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
 
     node->kind = ANT_ARRAY;
     node->location = lbracket_token->location;
     node->as_array.elements = NULL;
     node->as_array.elements_length = 0;
 
-    parser->last_successfull_parsed_token = peek_token(parser);
+    parser->last_successfull_parsed_token = parser_peek_token(parser);
 
-    Cearch_Ast_Node* temp_elements[MAX_ARRAY_LENGTH];
-    int              temp_elements_length = 0;
+    cearch_ast_node_t *temp_elements[__cearch_parser_max_array_length];
+    int                temp_elements_length = 0;
 
-    while (parser->tokens_head != NULL && parser->tokens_head->kind != CT_RSQUARE) {
-        if (temp_elements_length >= MAX_ARRAY_LENGTH) {
-            throw_error_message(lbracket_token->location, "array exceeds maximum length of %d", MAX_ARRAY_LENGTH);
+    while (parser->tokens_head != NULL && parser->tokens_head->kind != CTK_RSQUARE) {
+        if (temp_elements_length >= __cearch_parser_max_array_length) {
+            parser_throw_error_message(lbracket_token->location, "array exceeds maximum length of %d", __cearch_parser_max_array_length);
         }
 
         temp_elements[temp_elements_length++] = parse_expression(parser, 0);
 
-        if (parser->tokens_head->kind == CT_COMMA) {
-            parser->last_successfull_parsed_token = consume_token(parser); // eat the ','
-        } else if (parser->tokens_head->kind != CT_RSQUARE) {
-            throw_error_message(
+        if (parser->tokens_head->kind == CTK_COMMA) {
+            parser->last_successfull_parsed_token = parser_consume_token(parser); // eat the ','
+        } else if (parser->tokens_head->kind != CTK_RSQUARE) {
+            parser_throw_error_message(
                 parser->last_successfull_parsed_token->location,
                 "expected ',' or ']' in array but got '%s'",
-                cearch_token_kind_name(parser->tokens_head->kind)
+                cearch_token_kind_enum_name(parser->tokens_head->kind)
             );
         } else {
-            parser->last_successfull_parsed_token = peek_token(parser);
+            parser->last_successfull_parsed_token = parser_peek_token(parser);
         }
     }
 
-    if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CT_COMMA) {
-        throw_error_message(
+    if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CTK_COMMA) {
+        parser_throw_error_message(
             parser->last_successfull_parsed_token->location,
             "please, remove the trailing comma"
         );
     }
 
-    if (parser->tokens_head == NULL || parser->tokens_head->kind != CT_RSQUARE) {
-        throw_error_message(lbracket_token->location, "unterminated array, missing ']'");
+    if (parser->tokens_head == NULL || parser->tokens_head->kind != CTK_RSQUARE) {
+        parser_throw_error_message(lbracket_token->location, "unterminated array, missing ']'");
     }
 
-    Cearch_Token *rsquare = consume_token(parser); // eat ']'
+    cearch_token_t *rsquare = parser_consume_token(parser); // eat ']'
 
-    node->raw_string = (Cearch_String){
+    node->raw_string = (cearch_string_t){
         .value = lbracket_token->content.value,
         .size = rsquare->content.value - rsquare->content.value + rsquare->content.size,
     };
 
     if (temp_elements_length > 0) {
-        node->as_array.elements = clibs_arena_alloc(parser->ast_arena, temp_elements_length * sizeof(Cearch_Ast_Node*));
+        node->as_array.elements = cearch_arena_alloc(parser->ast_arena, temp_elements_length * sizeof(cearch_ast_node_t*));
         node->as_array.elements_length = temp_elements_length;
-        memcpy(node->as_array.elements, temp_elements, temp_elements_length * sizeof(Cearch_Ast_Node*));
+        memcpy(node->as_array.elements, temp_elements, temp_elements_length * sizeof(cearch_ast_node_t*));
     }
     
     return node;
 }
 
-static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *left) {
+static cearch_ast_node_t *parse_method(cearch_parser_t *parser, cearch_ast_node_t *left) {
     // eat '.'
-    Cearch_Token *dot_token = consume_token(parser);
+    cearch_token_t *dot_token = parser_consume_token(parser);
 
     // eat the function name
-    Cearch_Token *name_token = consume_token(parser);
+    cearch_token_t *name_token = parser_consume_token(parser);
 
-    if (!name_token || name_token->kind != CT_SYM) {
-        throw_error_message(dot_token->location, "expected method name after '.'");
+    if (!name_token || name_token->kind != CTK_SYM) {
+        parser_throw_error_message(dot_token->location, "expected method name after '.'");
     }
 
-    char *method_name = clibs_arena_alloc(parser->strs_arena, name_token->as_str.size + 1);
+    char *method_name = cearch_arena_alloc(parser->strs_arena, name_token->as_str.size + 1);
     memcpy(method_name, name_token->as_str.value, name_token->as_str.size);
     method_name[name_token->as_str.size] = '\0';
 
-    Cearch_Ast_Node *node = clibs_arena_alloc(parser->ast_arena, sizeof(Cearch_Ast_Node));
+    cearch_ast_node_t *node = cearch_arena_alloc(parser->ast_arena, sizeof(cearch_ast_node_t));
     node->kind = ANT_METHOD_CALL;
     node->location = dot_token->location;
-    node->as_method_call.method_name = (Cearch_String){
+    node->as_method_call.method_name = (cearch_string_t){
         .value = method_name,
         .size = name_token->as_str.size
     };
@@ -377,63 +370,63 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     node->as_method_call.arguments = NULL;
     node->as_method_call.arguments_length = 0;
 
-    Cearch_Token *last_method_call_expression_token = name_token;
+    cearch_token_t *last_method_call_expression_token = name_token;
 
     // zero-argument methods don't need parenthesis
-    if (peek_token(parser) != NULL && peek_token(parser)->kind == CT_LPAREN) {
+    if (parser_peek_token(parser) != NULL && parser_peek_token(parser)->kind == CTK_LPAREN) {
         // eat '('
-        consume_token(parser);
+        parser_consume_token(parser);
 
         parser->last_successfull_parsed_token = parser->tokens_head;
 
-        Cearch_Ast_Node* temp_arguments[MAX_FUNCTION_ARGUMENTS];
-        int              temp_arguments_length = 0;
+        cearch_ast_node_t *temp_arguments[__cearch_parser_max_function_arguments];
+        int                temp_arguments_length = 0;
 
         // parse until hit ')'
-        while (peek_token(parser) != NULL && peek_token(parser)->kind != CT_RPAREN) {
-            if (temp_arguments_length >= MAX_FUNCTION_ARGUMENTS) {
-                throw_error_message(name_token->location, "function exceeds maximum of %d arguments", MAX_FUNCTION_ARGUMENTS);
+        while (parser_peek_token(parser) != NULL && parser_peek_token(parser)->kind != CTK_RPAREN) {
+            if (temp_arguments_length >= __cearch_parser_max_function_arguments) {
+                parser_throw_error_message(name_token->location, "function exceeds maximum of %d arguments", __cearch_parser_max_function_arguments);
             }
 
             temp_arguments[temp_arguments_length++] = parse_expression(parser, PREC_NONE);
 
-            if (peek_token(parser)->kind == CT_COMMA) {
+            if (parser_peek_token(parser)->kind == CTK_COMMA) {
                 // eat ','
-                parser->last_successfull_parsed_token = consume_token(parser);
-            } else if (peek_token(parser)->kind != CT_RPAREN) {
-                throw_error_message(
+                parser->last_successfull_parsed_token = parser_consume_token(parser);
+            } else if (parser_peek_token(parser)->kind != CTK_RPAREN) {
+                parser_throw_error_message(
                     parser->last_successfull_parsed_token->location,
                     "expected ',' or ')' in argument list but got '%s'",
-                    cearch_token_kind_name(peek_token(parser)->kind)
+                    cearch_token_kind_enum_name(parser_peek_token(parser)->kind)
                 );
             } else {
-                parser->last_successfull_parsed_token = peek_token(parser);
+                parser->last_successfull_parsed_token = parser_peek_token(parser);
             }
         }
 
-        if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CT_COMMA) {
-            throw_error_message(
+        if (parser->last_successfull_parsed_token != NULL && parser->last_successfull_parsed_token->kind == CTK_COMMA) {
+            parser_throw_error_message(
                 parser->last_successfull_parsed_token->location,
                 "please, remove the trailing comma"
             );
         }
 
-        if (peek_token(parser) == NULL || peek_token(parser)->kind != CT_RPAREN) {
-            throw_error_message(name_token->location, "unterminated argument list, missing ')'");
+        if (parser_peek_token(parser) == NULL || parser_peek_token(parser)->kind != CTK_RPAREN) {
+            parser_throw_error_message(name_token->location, "unterminated argument list, missing ')'");
         }
 
         // eat ')'
-        last_method_call_expression_token = consume_token(parser);
+        last_method_call_expression_token = parser_consume_token(parser);
 
         if (temp_arguments_length > 0) {
-            node->as_method_call.arguments = clibs_arena_alloc(parser->ast_arena, temp_arguments_length * sizeof(Cearch_Ast_Node*));
+            node->as_method_call.arguments = cearch_arena_alloc(parser->ast_arena, temp_arguments_length * sizeof(cearch_ast_node_t*));
             node->as_method_call.arguments_length = temp_arguments_length;
 
-            memcpy(node->as_method_call.arguments, temp_arguments, temp_arguments_length * sizeof(Cearch_Ast_Node*));
+            memcpy(node->as_method_call.arguments, temp_arguments, temp_arguments_length * sizeof(cearch_ast_node_t*));
         }
     }
 
-    node->raw_string = (Cearch_String){
+    node->raw_string = (cearch_string_t){
         .value = left->raw_string.value,
         .size = last_method_call_expression_token->content.value - left->raw_string.value + last_method_call_expression_token->content.size,
     };
@@ -441,7 +434,7 @@ static Cearch_Ast_Node *parse_method(Cearch_Parser *parser, Cearch_Ast_Node *lef
     return node;
 }
 
-const char *cearch_parser_node_type_name(Cearch_Ast_Expr_Kind type)
+const char *parser_cearch_ast_expr_kind_name(cearch_ast_expr_kind_t type)
 {
     switch (type) {
         case ANT_NIL: return "nil";
@@ -454,15 +447,15 @@ const char *cearch_parser_node_type_name(Cearch_Ast_Expr_Kind type)
         case ANT_UNARY: return "unary";
         case ANT_BINARY: return "binary";
         case ANT_METHOD_CALL: return "method_call";
-        default: assert(0 && "cearch_parser_node_type_name: missing Cearch_Ast_Node_Type handling"); break;
+        default: assert(0 && "parser_cearch_ast_expr_kind_name: missing cearch_ast_expr_kind_t handling"); break;
     }
 }
 
-Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head) {
-    Cearch_Parser *parser = malloc(sizeof(Cearch_Parser));
+cearch_parser_t *cearch_parser_create(cearch_token_t *tokens_head) {
+    cearch_parser_t *parser = malloc(sizeof(cearch_parser_t));
 
-    Clibs_Arena *strs_arena = clibs_arena_create(PARSER_STRS_ARENA_CAPACITY);
-    Clibs_Arena *ast_arena = clibs_arena_create(PARSER_AST_ARENA_CAPACITY);
+    cearch_arena_t *strs_arena = cearch_arena_create(__cearch_parser_strs_arena_capacity);
+    cearch_arena_t *ast_arena = cearch_arena_create(__cearch_parser_ast_arena_capacity);
 
     parser->ast_arena = ast_arena;
     parser->strs_arena = strs_arena;
@@ -471,22 +464,22 @@ Cearch_Parser *cearch_create_parser(Cearch_Token *tokens_head) {
     return parser;
 }
 
-Cearch_Ast_Node *cearch_parse_expression(Cearch_Parser *parser) {
-    Cearch_Ast_Node *ast = parse_expression(parser, PREC_NONE);
+cearch_ast_node_t *cearch_parser_run(cearch_parser_t *parser) {
+    cearch_ast_node_t *ast = parse_expression(parser, PREC_NONE);
 
-    if (parser->tokens_head != NULL && parser->tokens_head->kind != CT_EOF) {
-        throw_error_message(
+    if (parser->tokens_head != NULL && parser->tokens_head->kind != CTK_EOF) {
+        parser_throw_error_message(
             parser->last_successfull_parsed_token->location,
             "invalid syntax. expected an operator or EOF but got '%s'",
-            cearch_token_kind_name(parser->tokens_head->kind)
+            cearch_token_kind_enum_name(parser->tokens_head->kind)
         );
     }
 
     return ast;
 }
 
-void cearch_free_parser(Cearch_Parser *parser) {
-    clibs_arena_destroy(parser->ast_arena);
-    clibs_arena_destroy(parser->strs_arena);
+void cearch_parser_free(cearch_parser_t *parser) {
+    cearch_arena_destroy(parser->ast_arena);
+    cearch_arena_destroy(parser->strs_arena);
     free(parser);
 }

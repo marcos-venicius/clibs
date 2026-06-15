@@ -4,6 +4,7 @@ LDFLAGS = -shared
 
 SRC_DIR = src
 BIN_DIR = bin
+LIBS_DIR = $(SRC_DIR)/libs
 
 LIB_NAME = $(BIN_DIR)/libcearch.so
 EXE_NAME = $(BIN_DIR)/cearch_test
@@ -27,9 +28,6 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 
 $(BIN_DIR):
 	mkdir -p $@
-
-amalg: src/amalg.h
-	$(CC) $(CFLAGS) -o $(BIN_DIR)/amalg $(SRC_DIR)/amalg.h
 
 clean:
 	rm -rf $(BIN_DIR)

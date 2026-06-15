@@ -1,46 +1,36 @@
-#define CLIBS_ARENA_IMPLEMENTATION
-
-#include "./lexer.h"
-#include "./location.h"
-
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <assert.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
-#define LOCATION_SNAPSHOTS_CAPACITY 256
-#define MAX_DIGIT_LENGTH 32
-#define MAX_FLOAT_POINT_LENGTH 32
-#define MAX_SYMBOL_LENGTH 64
-#define MAX_STRING_LENGTH 1024 * 5
-#define LEXER_TOKENS_ARENA_CAPACITY (sizeof(Cearch_Token) * 1024)
-#define LEXER_STRS_ARENA_CAPACITY (32 * 1024)
+#include "./lexer.h"
 
-static Cearch_Location location_snapshots[LOCATION_SNAPSHOTS_CAPACITY] = {0};
-static int location_snapshots_size;
+static cearch_location_t location_snapshots[__cearch_lexer_location_snapshots_capacity] = {0};
+static int location_snapshots_size = 0;
 
-static void save_location_snapshot(Cearch_Location location) {
-    assert(location_snapshots_size < LOCATION_SNAPSHOTS_CAPACITY && "exceeded location snapshots capacity");
+static void lexer_save_location_snapshot(cearch_location_t location) {
+    assert(location_snapshots_size < __cearch_lexer_location_snapshots_capacity && "exceeded location snapshots capacity");
 
     location_snapshots[location_snapshots_size++] = location;
 }
 
-static Cearch_Location get_location_snapshot() {
+static cearch_location_t lexer_pop_location_snapshot() {
     assert(location_snapshots_size > 0 && "empty location snapshots");
 
     return location_snapshots[--location_snapshots_size];
 }
 
-static Cearch_Location get_location_from_lexer(const Cearch_Lexer *lexer) {
-    return (Cearch_Location){
+static cearch_location_t lexer_build_location_snapshot(const cearch_lexer_t *lexer) {
+    return (cearch_location_t){
         .line = lexer->line,
         .col_start = lexer->col,
         .col_end = lexer->col + (lexer->cursor - lexer->bot)
     };
 }
 
-static void throw_error_message(Cearch_Location location, const char *fmt, ...) {
+static void lexer_throw_error_message(cearch_location_t location, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -58,58 +48,25 @@ static void throw_error_message(Cearch_Location location, const char *fmt, ...) 
     exit(1);
 }
 
-const char *cearch_token_kind_name(Cearch_Token_Kind kind) {
-    switch (kind) {
-        case CT_NIL: return "nil";
-        case CT_BOOL: return "bool";
-        case CT_STR: return "str";
-        case CT_INT: return "int";
-        case CT_FLOAT: return "float";
+static cearch_token_kind_enum_t cearch_string_as_token_kind_enum(cearch_string_t symbol) {
+    if (cmp_const_sized_str("nil", symbol.value, symbol.size)) return CTK_NIL;
+    if (cmp_const_sized_str("true", symbol.value, symbol.size)) return CTK_BOOL;
+    if (cmp_const_sized_str("false", symbol.value, symbol.size)) return CTK_BOOL;
+    if (cmp_const_sized_str("and", symbol.value, symbol.size)) return CTK_AND;
+    if (cmp_const_sized_str("or", symbol.value, symbol.size)) return CTK_OR;
 
-        case CT_LSQUARE: return "[";
-        case CT_RSQUARE: return "]";
-        case CT_LPAREN: return "(";
-        case CT_RPAREN: return ")";
-        case CT_COMMA: return ",";
-        case CT_DOT: return ".";
-        case CT_LT: return "<";
-        case CT_GT: return ">";
-        case CT_LTE: return "<=";
-        case CT_GTE: return ">=";
-        case CT_EQ: return "=";
-        case CT_NEQ: return "!=";
-        case CT_NOT: return "!";
-
-        case CT_OR: return "or";
-        case CT_AND: return "and";
-
-        case CT_SYM: return "sym";
-
-        case CT_EOF: return "eof";
-
-        default: assert(0 && "cearch_token_kind_name: missing Cearch_Token_Kind");
-    }
+    return CTK_SYM;
 }
 
-static Cearch_Token_Kind symbol_to_kind(Cearch_String symbol) {
-    if (strncmp("nil", symbol.value, symbol.size) == 0) return CT_NIL;
-    if (strncmp("true", symbol.value, symbol.size) == 0) return CT_BOOL;
-    if (strncmp("false", symbol.value, symbol.size) == 0) return CT_BOOL;
-    if (strncmp("and", symbol.value, symbol.size) == 0) return CT_AND;
-    if (strncmp("or", symbol.value, symbol.size) == 0) return CT_OR;
-
-    return CT_SYM;
-}
-
-static inline char chr(const Cearch_Lexer *const lexer) {
+static inline char lexer_chr(const cearch_lexer_t *const lexer) {
     return lexer->cursor < lexer->content_size ? lexer->content[lexer->cursor] : '\0';
 }
 
-static inline char nchr(const Cearch_Lexer *const lexer) {
+static inline char lexer_nchr(const cearch_lexer_t *const lexer) {
     return lexer->cursor + 1 < lexer->content_size ? lexer->content[lexer->cursor + 1] : '\0';
 }
 
-static inline void advance_cursor(Cearch_Lexer *lexer) {
+static inline void lexer_advance_cursor(cearch_lexer_t *lexer) {
     if (lexer->content[lexer->cursor] == '\n') {
         lexer->col = 1;
         lexer->line++;
@@ -120,27 +77,27 @@ static inline void advance_cursor(Cearch_Lexer *lexer) {
     if (lexer->cursor < lexer->content_size) lexer->cursor++;
 }
 
-static inline void sync_bot(Cearch_Lexer *lexer) {
+static inline void lexer_sync_bot(cearch_lexer_t *lexer) {
     lexer->bot = lexer->cursor;
 }
 
-static inline bool is_empty(const Cearch_Lexer * const lexer) {
-    return chr(lexer) == '\0';
+static inline bool lexer_is_empty(const cearch_lexer_t *const lexer) {
+    return lexer_chr(lexer) == '\0';
 }
 
-static inline bool is_digit(char c) {
+static inline bool lexer_is_digit(char c) {
     return c >= '0' && c <= '9';
 }
 
-static inline bool is_symbol(char c) {
+static inline bool lexer_is_symbol(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-static inline void ltrim_whitespaces(Cearch_Lexer *lexer) {
-    while (!is_empty(lexer) && (chr(lexer) == '\n' || chr(lexer) == '\t' || chr(lexer) == ' ')) advance_cursor(lexer);
+static inline void lexer_ltrim_whitespaces(cearch_lexer_t *lexer) {
+    while (!lexer_is_empty(lexer) && (lexer_chr(lexer) == '\n' || lexer_chr(lexer) == '\t' || lexer_chr(lexer) == ' ')) lexer_advance_cursor(lexer);
 }
 
-static inline void append_token(Cearch_Lexer *lexer, Cearch_Token *token) {
+static inline void lexer_append_token(cearch_lexer_t *lexer, cearch_token_t *token) {
     if (lexer->head == NULL) {
         lexer->head = lexer->tail = token;
     } else {
@@ -148,30 +105,42 @@ static inline void append_token(Cearch_Lexer *lexer, Cearch_Token *token) {
     }
 }
 
-static void lex_digit(Cearch_Lexer *lexer) {
-    advance_cursor(lexer);
+static void lex_digit(cearch_lexer_t *lexer) {
+    lexer_advance_cursor(lexer);
 
-    while (!is_empty(lexer) && is_digit(chr(lexer))) advance_cursor(lexer);
+    while (!lexer_is_empty(lexer) && lexer_is_digit(lexer_chr(lexer))) lexer_advance_cursor(lexer);
 
     bool is_float = false;
 
     int left_digit_length = lexer->cursor - lexer->bot;
 
-    if (chr(lexer) == '.') {
+    if (lexer_chr(lexer) == '.') {
         is_float = true;
 
-        advance_cursor(lexer);
+        lexer_advance_cursor(lexer);
 
-        while (!is_empty(lexer) && is_digit(chr(lexer))) advance_cursor(lexer);
+        while (!lexer_is_empty(lexer) && lexer_is_digit(lexer_chr(lexer))) lexer_advance_cursor(lexer);
     }
 
     int digit_length = lexer->cursor - lexer->bot;
 
-    if (left_digit_length > MAX_DIGIT_LENGTH)
-        throw_error_message(get_location_snapshot(), "your digit ('%.*s') overflew the maximum length of %d digits", digit_length, lexer->content + lexer->bot, MAX_DIGIT_LENGTH);
+    if (left_digit_length > __cearch_lexer_max_digit_length)
+        lexer_throw_error_message(
+            lexer_pop_location_snapshot(),
+            "your digit ('%.*s') overflew the maximum length of %d digits",
+            digit_length,
+            lexer->content + lexer->bot,
+            __cearch_lexer_max_digit_length
+        );
 
-    if (digit_length - left_digit_length - 1 > MAX_FLOAT_POINT_LENGTH)
-        throw_error_message(get_location_snapshot(), "your digit ('%.*s') overflew the maximum float point length of %d digits", digit_length, lexer->content + lexer->bot, MAX_FLOAT_POINT_LENGTH);
+    if (digit_length - left_digit_length - 1 > __cearch_lexer_max_float_point_length)
+        lexer_throw_error_message(
+            lexer_pop_location_snapshot(),
+            "your digit ('%.*s') overflew the maximum float point length of %d digits",
+            digit_length,
+            lexer->content + lexer->bot,
+            __cearch_lexer_max_float_point_length
+        );
 
     char *digit = alloca(digit_length + 1);
 
@@ -180,131 +149,139 @@ static void lex_digit(Cearch_Lexer *lexer) {
     digit[digit_length] = '\0';
 
     char *endptr;
-    Cearch_Token *token = clibs_arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
+    cearch_token_t *token = cearch_arena_alloc(lexer->tokens_arena, sizeof(cearch_token_t));
 
     if (is_float) {
         double value = strtod(digit, &endptr);
 
         if (digit == endptr) {
-            throw_error_message(get_location_snapshot(), "could not parse '%s' as float", digit);
+            lexer_throw_error_message(lexer_pop_location_snapshot(), "could not parse '%s' as float", digit);
         }
 
-        *token = (Cearch_Token){
-            .content = (Cearch_String){
+        *token = (cearch_token_t){
+            .content = (cearch_string_t){
                 .value = lexer->content + lexer->bot,
                 .size = digit_length,
             },
-            .kind = CT_FLOAT,
+            .kind = CTK_FLOAT,
             .as_float = value,
-            .location = get_location_snapshot(),
+            .location = lexer_pop_location_snapshot(),
             .next = NULL
         };
     } else {
         long value = strtol(digit, &endptr, 10);
 
         if (digit == endptr) {
-            throw_error_message(get_location_snapshot(), "could not parse '%s' as int", digit);
+            lexer_throw_error_message(lexer_pop_location_snapshot(), "could not parse '%s' as int", digit);
         }
 
-        *token = (Cearch_Token){
-            .content = (Cearch_String){
+        *token = (cearch_token_t){
+            .content = (cearch_string_t){
                 .value = lexer->content + lexer->bot,
                 .size = digit_length,
             },
-            .kind = CT_INT,
+            .kind = CTK_INT,
             .as_int = value,
-            .location = get_location_snapshot(),
+            .location = lexer_pop_location_snapshot(),
             .next = NULL
         };
     }
 
-    append_token(lexer, token);
+    lexer_append_token(lexer, token);
 }
 
-static void lex_symbol(Cearch_Lexer *lexer) {
+static void lex_symbol(cearch_lexer_t *lexer) {
     int symbol_size = 0;
 
-    while (!is_empty(lexer) && is_symbol(chr(lexer))) {
+    while (!lexer_is_empty(lexer) && lexer_is_symbol(lexer_chr(lexer))) {
         symbol_size++;
 
-        if (symbol_size > MAX_SYMBOL_LENGTH)
-            throw_error_message(
-                get_location_snapshot(),
+        if (symbol_size > __cearch_lexer_max_symbol_length)
+            lexer_throw_error_message(
+                lexer_pop_location_snapshot(),
                 "your symbol (%.*s...) exceeded the max length of %d characters",
-                MAX_SYMBOL_LENGTH,
+                __cearch_lexer_max_symbol_length,
                 lexer->content + lexer->bot,
-                MAX_SYMBOL_LENGTH
+                __cearch_lexer_max_symbol_length
             );
 
-        advance_cursor(lexer);
+        lexer_advance_cursor(lexer);
     }
 
-    Cearch_String symbol = {
+    cearch_string_t symbol = {
         .size = symbol_size,
         .value = lexer->content + lexer->bot
     };
 
-    Cearch_Token_Kind kind = symbol_to_kind(symbol);
+    cearch_token_kind_enum_t kind = cearch_string_as_token_kind_enum(symbol);
 
-    Cearch_Token *token = clibs_arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
+    cearch_token_t *token = cearch_arena_alloc(lexer->tokens_arena, sizeof(cearch_token_t));
 
-    *token = (Cearch_Token){
+    *token = (cearch_token_t){
         .kind = kind,
         .content = symbol,
-        .location = get_location_snapshot(),
+        .location = lexer_pop_location_snapshot(),
         .next = NULL
     };
 
-    if (kind == CT_BOOL) {
-        if (strncmp("true", symbol.value, symbol.size) == 0) token->as_bool = true;
-        else if (strncmp("false", symbol.value, symbol.size) == 0) token->as_bool = false;
-        else throw_error_message(token->location, "invalid boolean (%.*s)\n", symbol.size, symbol.value);
-    } else if (kind != CT_NIL) {
+    if (kind == CTK_BOOL) {
+        if (cmp_const_sized_str("true", symbol.value, symbol.size)) token->as_bool = true;
+        else if (cmp_const_sized_str("false", symbol.value, symbol.size)) token->as_bool = false;
+        else lexer_throw_error_message(token->location, "invalid boolean (%.*s)\n", symbol.size, symbol.value);
+    } else if (kind != CTK_NIL) {
         token->as_str = symbol;
     }
 
-    append_token(lexer, token);
+    lexer_append_token(lexer, token);
 }
 
-static void lex_string(Cearch_Lexer *lexer) {
-    advance_cursor(lexer);
+static void lex_string(cearch_lexer_t *lexer) {
+    char quote = lexer_chr(lexer);
+
+    lexer_advance_cursor(lexer);
 
     int string_length = 0;
 
-    while (!is_empty(lexer) && chr(lexer) != '\'') {
+    while (!lexer_is_empty(lexer) && lexer_chr(lexer) != quote) {
         string_length++;
 
-        if (chr(lexer) == '\\') {
-            switch (nchr(lexer)) {
+        if (lexer_chr(lexer) == '\\') {
+            switch (lexer_nchr(lexer)) {
                 case '\'':
+                case '"':
                 case 'n':
                 case 't':
                 case '\\':
-                    advance_cursor(lexer);
+                    lexer_advance_cursor(lexer);
                     break;
                 default:
-                    throw_error_message(get_location_snapshot(), "unrecognized escape sequence \\%c", nchr(lexer));
+                    lexer_throw_error_message(lexer_pop_location_snapshot(), "unrecognized escape sequence \\%c", lexer_nchr(lexer));
             }
-        } else if (chr(lexer) == '\n') {
-            throw_error_message(get_location_snapshot(), "you cannot have a line break inside a string literal");
+        } else if (lexer_chr(lexer) == '\n') {
+            lexer_throw_error_message(lexer_pop_location_snapshot(), "you cannot have a line break inside a string literal");
         }
 
-        if (string_length > MAX_STRING_LENGTH) {
-            throw_error_message(get_location_snapshot(), "string literal exceeded max length of %d characters", MAX_STRING_LENGTH);
+        if (string_length > __cearch_lexer_max_string_length) {
+            lexer_throw_error_message(lexer_pop_location_snapshot(), "string literal exceeded max length of %d characters", __cearch_lexer_max_string_length);
         }
 
-        advance_cursor(lexer);
+        lexer_advance_cursor(lexer);
     }
 
-    if (chr(lexer) != '\'') {
-        throw_error_message(get_location_snapshot(), "unterminated string '%.*s'", lexer->cursor - lexer->bot, lexer->content + lexer->bot);
+    if (lexer_chr(lexer) != quote) {
+        lexer_throw_error_message(
+            lexer_pop_location_snapshot(),
+            "unterminated string '%.*s'",
+            lexer->cursor - lexer->bot,
+            lexer->content + lexer->bot
+        );
     }
 
-    advance_cursor(lexer);
+    lexer_advance_cursor(lexer);
 
-    Cearch_Token *token = clibs_arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
+    cearch_token_t *token = cearch_arena_alloc(lexer->tokens_arena, sizeof(cearch_token_t));
 
-    Cearch_String content = {
+    cearch_string_t content = {
         .value = lexer->content + lexer->bot + 1,
         .size = lexer->cursor - lexer->bot - 2
     };
@@ -313,7 +290,7 @@ static void lex_string(Cearch_Lexer *lexer) {
     int str_index = 0;
     int str_size = lexer->cursor - lexer->bot - 2;
 
-    char *str = clibs_arena_alloc(lexer->strs_arena, str_size + 1);
+    char *str = cearch_arena_alloc(lexer->strs_arena, str_size + 1);
 
     assert(str != NULL && "could not allocate enough space for string");
 
@@ -327,6 +304,9 @@ static void lex_string(Cearch_Lexer *lexer) {
             switch (next_char) {
                 case '\'':
                     str[str_index++] = '\'';
+                    break;
+                case '"':
+                    str[str_index++] = '"';
                     break;
                 case 'n':
                     str[str_index++] = '\n';
@@ -349,43 +329,42 @@ static void lex_string(Cearch_Lexer *lexer) {
         i++;
     }
 
-    *token = (Cearch_Token){
-        .kind = CT_STR,
+    *token = (cearch_token_t){
+        .kind = CTK_STR,
         .content = content,
-        .as_str = (Cearch_String){
+        .as_str = (cearch_string_t){
             .value = str,
             .size = str_size
         },
-        .location = get_location_snapshot(),
+        .location = lexer_pop_location_snapshot(),
         .next = NULL
     };
 
-    append_token(lexer, token);
+    lexer_append_token(lexer, token);
 }
 
-static void lex_n(Cearch_Lexer *lexer, Cearch_Token_Kind kind, int n) {
-    for (int i = 0; i < n; ++i) advance_cursor(lexer);
+static void lex_n(cearch_lexer_t *lexer, cearch_token_kind_enum_t kind, int n) {
+    for (int i = 0; i < n; ++i) lexer_advance_cursor(lexer);
 
-    Cearch_Token *token = clibs_arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
+    cearch_token_t *token = cearch_arena_alloc(lexer->tokens_arena, sizeof(cearch_token_t));
 
-    *token = (Cearch_Token){
+    *token = (cearch_token_t){
         .kind = kind,
-        .content = (Cearch_String){
+        .content = (cearch_string_t){
             .value = lexer->content + lexer->bot,
             .size = n
         },
-        .location = get_location_snapshot(),
+        .location = lexer_pop_location_snapshot(),
         .next = NULL
     };
 
-    append_token(lexer, token);
+    lexer_append_token(lexer, token);
 }
 
-
-Cearch_Lexer *cearch_create_lexer(const char *content, size_t content_size) {
-    Cearch_Lexer *lexer = malloc(sizeof(Cearch_Lexer));
-    Clibs_Arena *tokens_arena = clibs_arena_create(LEXER_TOKENS_ARENA_CAPACITY);
-    Clibs_Arena *strs_arena = clibs_arena_create(LEXER_STRS_ARENA_CAPACITY);
+cearch_lexer_t *cearch_lexer_create(const char *content, size_t content_size) {
+    cearch_lexer_t *lexer = malloc(sizeof(cearch_lexer_t));
+    cearch_arena_t *tokens_arena = cearch_arena_create(__cearch_lexer_tokens_arena_capacity);
+    cearch_arena_t *strs_arena = cearch_arena_create(__cearch_lexer_strs_arena_capacity);
 
     lexer->line = 1;
     lexer->col = 1;
@@ -401,17 +380,17 @@ Cearch_Lexer *cearch_create_lexer(const char *content, size_t content_size) {
     return lexer;
 }
 
-Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
+cearch_token_t *cearch_lexer_run(cearch_lexer_t *lexer) {
     while (true) {
-        ltrim_whitespaces(lexer);
+        lexer_ltrim_whitespaces(lexer);
 
-        sync_bot(lexer);
+        lexer_sync_bot(lexer);
 
-        save_location_snapshot(get_location_from_lexer(lexer));
+        lexer_save_location_snapshot(lexer_build_location_snapshot(lexer));
 
-        if (is_empty(lexer)) break;
+        if (lexer_is_empty(lexer)) break;
 
-        switch (chr(lexer)) {
+        switch (lexer_chr(lexer)) {
             case '-':
             case '0':
             case '1':
@@ -423,56 +402,59 @@ Cearch_Token *cearch_lex(Cearch_Lexer *lexer) {
             case '7':
             case '8':
             case '9': lex_digit(lexer); break;
-            case '[': lex_n(lexer, CT_LSQUARE, 1); break;
-            case ']': lex_n(lexer, CT_RSQUARE, 1); break;
-            case '(': lex_n(lexer, CT_LPAREN, 1); break;
-            case ')': lex_n(lexer, CT_RPAREN, 1); break;
-            case ',': lex_n(lexer, CT_COMMA, 1); break;
-            case '.': lex_n(lexer, CT_DOT, 1); break;
-            case '=': lex_n(lexer, CT_EQ, 1); break;
-            case '\'': lex_string(lexer); break;
+            case '[': lex_n(lexer, CTK_LSQUARE, 1); break;
+            case ']': lex_n(lexer, CTK_RSQUARE, 1); break;
+            case '(': lex_n(lexer, CTK_LPAREN, 1); break;
+            case ')': lex_n(lexer, CTK_RPAREN, 1); break;
+            case ',': lex_n(lexer, CTK_COMMA, 1); break;
+            case '.': lex_n(lexer, CTK_DOT, 1); break;
+            case '=': lex_n(lexer, CTK_EQ, 1); break;
+            case '\'':
+            case '"':
+                lex_string(lexer);
+                break;
             case '!': {
-                if (nchr(lexer) == '=') {
-                    lex_n(lexer, CT_NEQ, 2);
+                if (lexer_nchr(lexer) == '=') {
+                    lex_n(lexer, CTK_NEQ, 2);
                 } else {
-                    lex_n(lexer, CT_NOT, 1);
+                    lex_n(lexer, CTK_NOT, 1);
                 }
             } break;
             case '>': {
-                if (nchr(lexer) == '=') {
-                    lex_n(lexer, CT_GTE, 2);
+                if (lexer_nchr(lexer) == '=') {
+                    lex_n(lexer, CTK_GTE, 2);
                 } else {
-                    lex_n(lexer, CT_GT, 1);
+                    lex_n(lexer, CTK_GT, 1);
                 }
             } break;
             case '<': {
-                if (nchr(lexer) == '=') {
-                    lex_n(lexer, CT_LTE, 2);
+                if (lexer_nchr(lexer) == '=') {
+                    lex_n(lexer, CTK_LTE, 2);
                 } else {
-                    lex_n(lexer, CT_LT, 1);
+                    lex_n(lexer, CTK_LT, 1);
                 }
             } break;
             default:
-                if (is_symbol(chr(lexer))) {
+                if (lexer_is_symbol(lexer_chr(lexer))) {
                     lex_symbol(lexer);
                     break;
                 }
 
-                throw_error_message(get_location_snapshot(), "unrecognized character '%c'", chr(lexer));
+                lexer_throw_error_message(lexer_pop_location_snapshot(), "unrecognized character '%c'", lexer_chr(lexer));
                 break;
         }
     }
 
-    Cearch_Token *eof = clibs_arena_alloc(lexer->tokens_arena, sizeof(Cearch_Token));
-    *eof = (Cearch_Token){ .kind = CT_EOF, .location = get_location_snapshot() };
+    cearch_token_t *eof = cearch_arena_alloc(lexer->tokens_arena, sizeof(cearch_token_t));
+    *eof = (cearch_token_t){ .kind = CTK_EOF, .location = lexer_pop_location_snapshot() };
 
-    append_token(lexer, eof);
+    lexer_append_token(lexer, eof);
 
     return lexer->head;
 }
 
-void cearch_lexer_free(Cearch_Lexer *lexer) {
-    clibs_arena_destroy(lexer->strs_arena);
-    clibs_arena_destroy(lexer->tokens_arena);
+void cearch_lexer_free(cearch_lexer_t *lexer) {
+    cearch_arena_destroy(lexer->strs_arena);
+    cearch_arena_destroy(lexer->tokens_arena);
     free(lexer);
 }

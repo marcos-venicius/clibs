@@ -1,6 +1,6 @@
+#include "./token.h"
 #include "./lexer.h"
 #include "./parser.h"
-#include "./api/cearch.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -11,18 +11,18 @@
 {                                                                                   \
     if (RUN_TESTS) {                                                                \
         printf("query: "q"\n");                                                     \
-        Cearch_Lexer *lexer = cearch_create_lexer(q, strlen(q));                    \
-        Cearch_Token *head = cearch_lex(lexer);                                     \
+        cearch_lexer_t *lexer = cearch_lexer_create(q, strlen(q));                    \
+        cearch_token_t *head = cearch_lexer_run(lexer);                                     \
         if (head == NULL) {                                                         \
             printf("  (null)\n");                                                   \
         } else {                                                                    \
-            printf("  %s\n", cearch_token_kind_name(head->kind));                   \
+            printf("  %s\n", cearch_token_kind_enum_name(head->kind));                   \
             switch (head->kind) {                                                   \
-                case CT_NIL: printf("  nil\n"); break;                              \
-                case CT_BOOL: printf(head->as_bool ? "  true" : "  false"); break;  \
-                case CT_INT: printf("  %d\n", head->as_int); break;                 \
-                case CT_FLOAT: printf("  %lf\n", head->as_float); break;            \
-                case CT_STR: printf("  %s\n", head->as_str.value); break;           \
+                case CTK_NIL: printf("  nil\n"); break;                              \
+                case CTK_BOOL: printf(head->as_bool ? "  true" : "  false"); break;  \
+                case CTK_INT: printf("  %d\n", head->as_int); break;                 \
+                case CTK_FLOAT: printf("  %lf\n", head->as_float); break;            \
+                case CTK_STR: printf("  %s\n", head->as_str.value); break;           \
                 default:                                                            \
                     printf("  %.*s\n", head->content.size, head->content.value);    \
                     break;                                                          \
@@ -37,29 +37,32 @@
     do {                                                                                \
         if (RUN_TESTS) {                                                                \
             printf("TEST_PARSER("label", \""expression"\"):\n");                        \
-            Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));  \
-            Cearch_Token *head = cearch_lex(lexer);                                     \
-            Cearch_Parser *parser = cearch_create_parser(head);                         \
-            Cearch_Ast_Node *ast = cearch_parse_expression(parser);                     \
+            cearch_lexer_t *lexer = cearch_lexer_create(expression, strlen(expression));  \
+            cearch_token_t *head = cearch_lexer_run(lexer);                                     \
+            cearch_parser_t *parser = cearch_parser_create(head);                         \
+            cearch_ast_node_t *ast = cearch_parser_run(parser);                     \
             printf("remounted ast: ");                                                  \
             print_ast_back_as_code(ast);                                                \
             printf("\n");                                                               \
             printf("ast graph:\n");                                                     \
             cearch_print_ast(ast, 1);                                                   \
-            cearch_free_parser(parser);                                                 \
+            cearch_parser_free(parser);                                                 \
             cearch_lexer_free(lexer);                                                   \
             printf("\n\n");                                                             \
         }                                                                               \
     } while (0)
 
-void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
+void cearch_print_ast(cearch_ast_node_t *node, int depth) {
     if (!node) return;
 
     // 1. Print Indentation
-    for (int i = 0; i < depth; i++) printf(" ");
+    for (int i = 0; i < depth; i++) printf("  ");
 
     // 2. Handle Node Types
     switch (node->kind) {
+        case ANT_NIL:
+            printf("nil\n");
+            break;
         case ANT_INT:
             printf("int(%d)\n", node->as_int);
             break;
@@ -75,14 +78,12 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
         case ANT_IDENTIFIER:
             printf("sym(%s)\n", node->as_identifier.value);
             break;
-
         case ANT_UNARY:
-            printf("unary(%s):\n", cearch_token_kind_name(node->as_unary.op));
+            printf("unary(%s):\n", cearch_token_kind_enum_name(node->as_unary.op));
             cearch_print_ast(node->as_unary.operand, depth + 1);
             break;
-
         case ANT_BINARY:
-            printf("binary(%s):\n", cearch_token_kind_name(node->as_binary.op));
+            printf("binary(%s):\n", cearch_token_kind_enum_name(node->as_binary.op));
             cearch_print_ast(node->as_binary.left, depth + 1);
             cearch_print_ast(node->as_binary.right, depth + 1);
             break;
@@ -90,13 +91,13 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
         case ANT_METHOD_CALL:
             printf("call(.%s):\n", node->as_method_call.method_name.value);
             // Print 'self' (the object the method is called on)
-            for (int i = 0; i <= depth; i++) printf(" ");
+            for (int i = 0; i <= depth; i++) printf("  ");
             printf("self:\n");
             cearch_print_ast(node->as_method_call.self, depth + 2);
             
             // Print arguments
             if (node->as_method_call.arguments_length > 0) {
-                for (int i = 0; i <= depth; i++) printf(" ");
+                for (int i = 0; i <= depth; i++) printf("  ");
                 printf("args: \n");
                 for (int i = 0; i < node->as_method_call.arguments_length; i++) {
                     cearch_print_ast(node->as_method_call.arguments[i], depth + 2);
@@ -117,7 +118,7 @@ void cearch_print_ast(Cearch_Ast_Node *node, int depth) {
     }
 }
 
-void print_ast_back_as_code(Cearch_Ast_Node *node) {
+void print_ast_back_as_code(cearch_ast_node_t *node) {
     switch (node->kind) {
         case ANT_NIL:
             printf("nil");
@@ -162,24 +163,24 @@ void print_ast_back_as_code(Cearch_Ast_Node *node) {
             }
             break;
         case ANT_BINARY:
-            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf("(");
+            if (node->as_binary.op == CTK_OR || node->as_binary.op == CTK_AND) printf("(");
             print_ast_back_as_code(node->as_binary.left);
-            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf(")");
+            if (node->as_binary.op == CTK_OR || node->as_binary.op == CTK_AND) printf(")");
 
-            printf(" %s ", cearch_token_kind_name(node->as_binary.op));
+            printf(" %s ", cearch_token_kind_enum_name(node->as_binary.op));
 
-            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf("(");
+            if (node->as_binary.op == CTK_OR || node->as_binary.op == CTK_AND) printf("(");
             print_ast_back_as_code(node->as_binary.right);
-            if (node->as_binary.op == CT_OR || node->as_binary.op == CT_AND) printf(")");
+            if (node->as_binary.op == CTK_OR || node->as_binary.op == CTK_AND) printf(")");
             break;
         case ANT_UNARY:
-            printf("%s", cearch_token_kind_name(node->as_unary.op));
+            printf("%s", cearch_token_kind_enum_name(node->as_unary.op));
             printf("(");
             print_ast_back_as_code(node->as_unary.operand);
             printf(")");
             break;
         default:
-            printf("%s", cearch_parser_node_type_name(node->kind));
+            printf("%s", parser_cearch_ast_expr_kind_name(node->kind));
             break;
     }
 }
@@ -193,15 +194,15 @@ int main(int argc, char **argv) {
     if (argc == 2) {
         char *expression = *(argv + 1);
 
-        Cearch_Lexer *lexer = cearch_create_lexer(expression, strlen(expression));
-        Cearch_Token *head = cearch_lex(lexer);
-        Cearch_Parser *parser = cearch_create_parser(head);
-        Cearch_Ast_Node *ast = cearch_parse_expression(parser);
+        cearch_lexer_t *lexer = cearch_lexer_create(expression, strlen(expression));
+        cearch_token_t *head = cearch_lexer_run(lexer);
+        cearch_parser_t *parser = cearch_parser_create(head);
+        cearch_ast_node_t *ast = cearch_parser_run(parser);
         printf("\nast back to code: ");
         print_ast_back_as_code(ast);
         printf("\n\nast tree:\n");
         cearch_print_ast(ast, 1);
-        cearch_free_parser(parser);
+        cearch_parser_free(parser);
         cearch_lexer_free(lexer);
         printf("\n");                                                               \
 
@@ -242,29 +243,6 @@ int main(int argc, char **argv) {
     TEST_PARSER("002",  "(status >= 200 and status < 300) or path.trim.lower = '/api/tracking'");
     TEST_PARSER("003", "(((!(false) or (!!true))))");
     TEST_PARSER("004", "![1, 2, 3, 5, 8, 13].contains(5) or [[1, 2, 4], [1, 2, 3], [0]].contains([0])");
-
-    Cearch *cearch = cearch_init();
-
-    // defining variables schema
-
-    cearch_define_variable(cearch, "method", "str");
-    cearch_define_variable(cearch, "status", "int");
-    cearch_define_variable(cearch, "user_agent", "str?");
-    cearch_define_variable(cearch, "request", "str?");
-    cearch_define_variable(cearch, "response", "str?");
-    cearch_define_variable(cearch, "stars", "array<bool>");
-    cearch_define_variable(cearch, "vector", "array<array<float>>");
-
-    // printing the schema to the stdout
-
-    cearch_debug_variables(cearch);
-
-    cearch_compile(cearch, "method = 'post' and starts.len = 5");
-
-    // free memory
-
-    cearch_free(cearch);
-
 
     return 0;
 }

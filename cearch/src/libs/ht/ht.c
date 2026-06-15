@@ -1,10 +1,10 @@
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
 #include "./ht.h"
 
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-
-static int hash_key(const char *key) {
+static int ht_hash_key(const char *key) {
     const unsigned char *str = (const unsigned char*)key;
 
     unsigned long hash = 5381;
@@ -12,11 +12,11 @@ static int hash_key(const char *key) {
 
     while ((c = *str++)) hash = ((hash << 5) + hash) + c;
 
-    return hash % _HT_SIZE;
+    return hash % __cearch_ht_size;
 }
 
-static Ht_Node* alloc_node(Ht* ht, const char *key, int key_length, void *data) {
-    Ht_Node* node = malloc(sizeof(Ht_Node));
+static ht_node_t *ht_alloc_node(ht_t *ht, const char *key, int key_length, void *data) {
+    ht_node_t *node = malloc(sizeof(ht_node_t));
 
     // I'm using strdup (which includes the null-byte) because
     // we may want provide a loop for the client with all keys and values.
@@ -32,14 +32,14 @@ static Ht_Node* alloc_node(Ht* ht, const char *key, int key_length, void *data) 
     return node;
 }
 
-static inline void free_node(Ht_Node* node) {
+static inline void ht_free_node(ht_node_t *node) {
     free(node->data);
     free(node->name.key);
     free(node);
 }
 
-Ht* ht_init(int data_size) {
-    Ht* ht = calloc(1, sizeof(Ht));
+ht_t *ht_init(int data_size) {
+    ht_t *ht = calloc(1, sizeof(ht_t));
 
     assert(data_size > 0 && "'data_size' should be greater than zero");
 
@@ -48,18 +48,18 @@ Ht* ht_init(int data_size) {
     return ht;
 }
 
-void ht_add(Ht *ht, const char *key, void *data) {
+void ht_add(ht_t *ht, const char *key, void *data) {
     // TODO: we're not rehashing the keys,
     //       we may do it in the future, but for the current
     //       purpose of this DS we don't need it.
-    int index = hash_key(key);
+    int index = ht_hash_key(key);
     int key_length = strlen(key);
 
     if (ht->nodes[index] == NULL) {
-        ht->nodes[index] = alloc_node(ht, key, key_length, data);
+        ht->nodes[index] = ht_alloc_node(ht, key, key_length, data);
     } else {
-        Ht_Node* slow = NULL;
-        Ht_Node* fast = ht->nodes[index];
+        ht_node_t *slow = NULL;
+        ht_node_t *fast = ht->nodes[index];
 
         while (fast != NULL) {
             // exact same key
@@ -74,15 +74,15 @@ void ht_add(Ht *ht, const char *key, void *data) {
         }
 
         // added new node at the end
-        slow->next = alloc_node(ht, key, key_length, data);
+        slow->next = ht_alloc_node(ht, key, key_length, data);
     }
 }
 
-void* ht_find(Ht* ht, const char* key) {
-    int index = hash_key(key);
+void *ht_find(ht_t *ht, const char *key) {
+    int index = ht_hash_key(key);
     int key_length = strlen(key);
 
-    Ht_Node* curr = ht->nodes[index];
+    ht_node_t *curr = ht->nodes[index];
 
     while (curr != NULL) {
         if (curr->name.length == key_length && (memcmp(curr->name.key, key, key_length) == 0))
@@ -94,15 +94,15 @@ void* ht_find(Ht* ht, const char* key) {
     return NULL;
 }
 
-void ht_free(Ht* ht) {
+void ht_free(ht_t *ht) {
     // TODO: use arena?
-    for (int i = 0; i < _HT_SIZE; i++) {
-        Ht_Node* head = ht->nodes[i];
+    for (int i = 0; i < __cearch_ht_size; i++) {
+        ht_node_t *head = ht->nodes[i];
 
         while (head != NULL) {
-            Ht_Node* next = head->next;
+            ht_node_t *next = head->next;
 
-            free_node(head);
+            ht_free_node(head);
 
             head = next;
         }
@@ -111,19 +111,18 @@ void ht_free(Ht* ht) {
     free(ht);
 }
 
-
 // ITERATOR STUFF
 
-Ht_Iterator ht_iterator(Ht* ht) {
-    return (Ht_Iterator){
+ht_iterator_t ht_iterator(ht_t *ht) {
+    return (ht_iterator_t){
         .ht = ht,
         .it = NULL,
         .idx = 0
     };
 }
 
-Ht_Node* ht_iterator_next(Ht_Iterator* it) {
-    if (it == NULL || (it->idx >= _HT_SIZE && it->it == NULL)) return NULL;
+ht_node_t *ht_iterator_next(ht_iterator_t *it) {
+    if (it == NULL || (it->idx >= __cearch_ht_size && it->it == NULL)) return NULL;
 
     if (it->it != NULL) {
         if (it->it->next != NULL)
@@ -132,7 +131,7 @@ Ht_Node* ht_iterator_next(Ht_Iterator* it) {
             it->idx++;
     }
 
-    while (it->idx < _HT_SIZE) {
+    while (it->idx < __cearch_ht_size) {
         if (it->ht->nodes[it->idx] != NULL) {
             it->it = it->ht->nodes[it->idx];
 

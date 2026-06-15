@@ -1,79 +1,33 @@
-#ifndef _CEARCH_LEXER_H_
-#define _CEARCH_LEXER_H_
+#ifndef __cearch_lexer_h_
+#define __cearch_lexer_h_
 
-#include "./string.h"
-#include "./location.h"
-#include "./arena.h"
-
-#include <stdbool.h>
-
-typedef enum {
-    // data types
-    CT_NIL = 0,
-    CT_BOOL,
-    CT_STR,
-    CT_INT,
-    CT_FLOAT,
-
-    // operators
-    CT_LSQUARE,
-    CT_RSQUARE,
-    CT_LPAREN,
-    CT_RPAREN,
-    CT_COMMA,
-    CT_DOT,
-    CT_LT,
-    CT_GT,
-    CT_LTE,
-    CT_GTE,
-    CT_EQ,
-    CT_NEQ,
-    CT_NOT,
-
-    // logical operators
-    CT_OR,
-    CT_AND,
-
-    // symbols
-    CT_SYM,
-
-    CT_EOF
-} Cearch_Token_Kind;
-
-
-typedef struct Cearch_Token Cearch_Token;
-
-struct Cearch_Token {
-    Cearch_Location    location;
-    Cearch_Token_Kind  kind;
-    Cearch_String      content; // actual string representation of the token
-
-    Cearch_Token *next;
-
-    union {
-        Cearch_String as_str;
-        bool          as_bool;
-        double        as_float;
-        int           as_int;
-    };
-};
+#include "./token.h"
+#include "./libs/utils/utils.h"
+#include "./libs/arena/arena.h"
 
 typedef struct {
     const char *content;
-    int content_size;
+    int         content_size;
 
     int line, col, bot, cursor;
 
-    Cearch_Token *head;
-    Cearch_Token *tail;
+    cearch_token_t *head;
+    cearch_token_t *tail;
 
-    Clibs_Arena *tokens_arena;
-    Clibs_Arena *strs_arena;
-} Cearch_Lexer;
+    cearch_arena_t *tokens_arena;
+    cearch_arena_t *strs_arena;
+} cearch_lexer_t;
 
-Cearch_Lexer *cearch_create_lexer(const char *content, size_t content_size);
-Cearch_Token *cearch_lex(Cearch_Lexer *lexer);
-const char *cearch_token_kind_name(Cearch_Token_Kind kind);
-void cearch_lexer_free(Cearch_Lexer *lexer);
+#define __cearch_lexer_location_snapshots_capacity 256
+#define __cearch_lexer_max_digit_length 32
+#define __cearch_lexer_max_float_point_length 32
+#define __cearch_lexer_max_symbol_length 64
+#define __cearch_lexer_max_string_length (1024 * 5)
+#define __cearch_lexer_tokens_arena_capacity (sizeof(cearch_token_t) * 1024)
+#define __cearch_lexer_strs_arena_capacity (32 * 1024)
 
-#endif // _CEARCH_LEXER_H_
+cearch_lexer_t *cearch_lexer_create(const char *content, size_t content_size);
+cearch_token_t *cearch_lexer_run(cearch_lexer_t *lexer);
+void cearch_lexer_free(cearch_lexer_t *lexer);
+
+#endif // __cearch_lexer_h_
