@@ -1,3 +1,8 @@
+//  Copyright (c) 2026 Marcos Venicius
+// 
+//  Author:           https://github.com/marcos-venicius
+//  Original Repo:    https://github.com/marcos-venicius/clibs
+
 #ifndef CLIBS_ARENA
 #define CLIBS_ARENA
 
@@ -20,7 +25,6 @@ void clibs_arena_destroy(Clibs_Arena *arena);
 
 #endif // CLIBS_ARENA
 
-#define CLIBS_ARENA_IMPLEMENTATION
 #ifdef CLIBS_ARENA_IMPLEMENTATION
 
 #include <stdlib.h>
